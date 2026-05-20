@@ -27,15 +27,18 @@ export function updateHud(state) {
   if (lifeEl) lifeEl.textContent = `已掉落: ${totalBombsDropped}/${targetBombs}`;
 
   if (isAnalyzing) {
-    statusEl.textContent = '狀態: 🎵 音樂解析中，請稍候...';
+    if (statusEl) statusEl.textContent = '狀態: 🎵 音樂解析中，請稍候...';
     if (exitBtn) exitBtn.style.display = 'none';
   } else if (!state.gameStarted) {
-    if (musicBeatsLength > 0) {
-      statusEl.textContent = `狀態: ✅ 載入 ${targetBombs} 顆炸彈 (按開始遊戲)`;
-    } else {
-      statusEl.textContent = modelLoaded ? '狀態: 準備中 (請先上傳音樂)' : '狀態: 正在載入 AI 模型...';
+    if (statusEl) {
+      if (musicBeatsLength > 0) {
+        statusEl.textContent = `狀態: ✅ 系統就緒 (已載入 ${targetBombs} 顆炸彈)`;
+      } else {
+        statusEl.textContent = modelLoaded ? '狀態: 準備中 (請先上傳音樂)' : '狀態: 正在載入 AI 模型...';
+      }
     }
     if (startBtn) {
+      // 🌟 優化：只要模型與特徵加載好了，一律大方顯示按鈕
       startBtn.style.display = (modelLoaded && gesturesLoaded) ? 'block' : 'none';
       startBtn.textContent = '開始遊戲';
     }
@@ -43,7 +46,7 @@ export function updateHud(state) {
     if (restartBtn) restartBtn.style.display = 'none';
     if (exitBtn) exitBtn.style.display = 'none';
   } else if (gameOver) {
-    statusEl.textContent = win ? '狀態: 🎉 任務成功！' : '狀態: 💥 任務失敗';
+    if (statusEl) statusEl.textContent = win ? '狀態: 🎉 任務成功！' : '狀態: 💥 任務失敗';
     if (startBtn) {
       startBtn.style.display = 'block';
       startBtn.textContent = '再玩一次';
@@ -52,7 +55,7 @@ export function updateHud(state) {
     if (restartBtn) restartBtn.style.display = 'none';
     if (exitBtn) exitBtn.style.display = 'none';
   } else if (state.gamePaused) {
-    statusEl.textContent = '狀態: ⏸️ 暫停中';
+    if (statusEl) statusEl.textContent = '狀態: ⏸️ 暫停中';
     if (pauseBtn) {
       pauseBtn.style.display = 'block';
       pauseBtn.textContent = '繼續';
@@ -60,17 +63,15 @@ export function updateHud(state) {
     if (restartBtn) restartBtn.style.display = 'block';
     if (exitBtn) exitBtn.style.display = 'block';
   } else {
-    statusEl.textContent = '狀態: 🚀 任務執行中...';
-    if (startBtn) startBtn.style.display = 'none'; // 🌟 修正：遊戲中隱藏開始按鈕
-    if (pauseBtn) {
-      pauseBtn.style.display = 'block';
-      pauseBtn.textContent = '暫停';
-    }
+    // 🌟 核心戰鬥狀態
+    if (statusEl) statusEl.textContent = '狀態: 🚀 任務執行中...';
+    if (startBtn) startBtn.style.display = 'none'; 
+    if (pauseBtn) pauseBtn.style.display = 'block';
     if (restartBtn) restartBtn.style.display = 'none';
     if (exitBtn) exitBtn.style.display = 'block';
   }
 
-  // 🌟 全域處理難度選單顯示（已由引導精靈接管，此處永久隱藏以維護介面清爽）
+  // 永久隱藏主畫面的下拉選單，交由引導控制
   const diffSelect = document.getElementById('difficulty-select');
   if (diffSelect) {
     diffSelect.style.display = 'none';
@@ -83,13 +84,11 @@ export function renderHistory() {
   
   let history = [];
   try {
-    // 🌟 防護機制：先檢查 localStorage 是否可用
     const storage = window.localStorage;
     if (!storage) throw new Error("Storage is null");
     history = JSON.parse(storage.getItem('tsl_history') || '[]');
   } catch (e) {
     console.warn("⚠️ 本地儲存空間被封鎖，改用記憶體暫存模式。");
-    // 如果被封鎖，嘗試從我們全域宣告的暫存變數讀取 (如果有的話)
     history = window._memoryHistory || [];
   }
 
@@ -130,12 +129,10 @@ export async function loadTutorialVideos() {
       videoBtn.style.cssText = "background: linear-gradient(135deg, #cc99ff, #9933cc); color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 20px; box-shadow: 0 4px 12px rgba(153, 51, 204, 0.3); transition: all 0.2s ease;";
       videoBtn.textContent = "📺 影片";
       
-      // 🌟 修正：支援 VIDEO_CDN_BASE 以便將影片上傳至 GitHub/jsDelivr 等高速 CDN (若為離線狀態則直接使用本地相對路徑，免去等待 CDN 逾時)
       const levelDir = WORD_DIFFICULTY[item.word_zh.trim()] || "Unclassified";
       const hasNetwork = navigator.onLine;
       const localVideoUrl = `${(hasNetwork && VIDEO_CDN_BASE) ? VIDEO_CDN_BASE : ''}videos/Level_${levelDir}/${item.word_zh.trim()}.mp4`;
       
-      // 🌟 瀏覽器背景預載入 (Prefetch) 優化：讓瀏覽器在閒置時提早下載影片快取，點擊時即可瞬間秒播！
       const prefetchLink = document.createElement('link');
       prefetchLink.rel = 'prefetch';
       prefetchLink.href = localVideoUrl;
@@ -143,7 +140,6 @@ export async function loadTutorialVideos() {
       document.head.appendChild(prefetchLink);
       
       videoBtn.onclick = () => {
-        // 尋找或建立影片播放容器
         let videoContainer = document.getElementById('local-video-player-container');
         if (!videoContainer) {
           videoContainer = document.createElement('div');
@@ -174,7 +170,6 @@ export async function loadTutorialVideos() {
         
         videoEl.src = localVideoUrl;
         
-        // 🌟 處理讀取失敗 (雙重備援：CDN 載入失敗時，自動降級讀取本地端的 videos/ 目錄)
         videoEl.onerror = () => {
           const relativePath = `videos/Level_${levelDir}/${item.word_zh.trim()}.mp4`;
           if (videoEl.src && !videoEl.src.endsWith(relativePath)) {
