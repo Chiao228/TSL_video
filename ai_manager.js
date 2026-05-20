@@ -57,8 +57,6 @@ export class AIManager {
       ? "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/"
       : "./";
     
-    // 🔥 ⚡【關鍵速度優化 1】優化 WASM 核心環境變數（支援多執行緒與 SIMD 加速）
-    // 當不支援 WebGPU 降級到 WASM 時，利用硬體多核心加速，效能提升 2~3 倍
     ort.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
     ort.env.wasm.simd = true;
     
@@ -68,15 +66,15 @@ export class AIManager {
     const onnxModelPath = `${baseCdn}train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx`;
     const onnxDataPath = `${baseCdn}train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx.data`;
     
-    // 🔥 ⚡【關鍵速度優化 2】推論後端全面升級
-    // 將 'webgpu' 設為第一順位（2026 最頂級網頁 AI 加速後端），其次為 'webgl'，最後 'wasm' 後備。
     const executionProviders = ['webgpu', 'webgl', 'wasm'];
     const sessionOptions = {
       executionProviders: executionProviders, 
-      graphOptimizationLevel: 'all', // 開啟所有圖優化
-      enableCpuMemBuffer: true       // 允許 GPU/CPU 之間高效記憶體緩衝
+      graphOptimizationLevel: 'all', 
+      enableCpuMemBuffer: true,
+      logSeverityLevel: 3 // 🌟 關鍵優化：調高日誌層級，直接封鎖 ONNX 內部的非致命警告，防堵非同步阻塞
     };
 
+    // 🌟 核心防禦改動：將 CDN 載入與本地載入拆開，確保只要有一邊成功，就能順利 return，絕不卡死 app.js
     try {
       console.log(`🧠 正在下載 ONNX 外部權重資料 (CDN)... | 路徑: ${onnxDataPath}`);
       const dataRes = await fetch(onnxDataPath);
@@ -84,40 +82,45 @@ export class AIManager {
       const dataBuf = await dataRes.arrayBuffer();
       const externalData = new Uint8Array(dataBuf);
 
-      // 帶入加速設定與外部權重
       sessionOptions.externalData = [
         { path: "tsl_model_fold1.onnx.data", data: externalData },
         { path: "./tsl_model_fold1.onnx.data", data: externalData }
       ];
 
       this.onnxSession = await ort.InferenceSession.create(onnxModelPath, sessionOptions);
-      console.log(`✅ ONNX 模型載入成功！核心加速器啟用中。`);
+      console.log(`✅ ONNX 模型（CDN 管道）載入成功！核心加速器啟用中。`);
+      return; // 🎉 成功就立刻退出，讓 app.js 繼續往下跑！
     } catch (err) {
-      console.log(`ℹ️ CDN 模型或權重不可用 (將自本地端讀取): ${err.message}`);
-      const localOnnxPath = `./train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx`;
-      const localDataPath = `./train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx.data`;
-      try {
-        console.log(`🧠 正在讀取本地 ONNX 外部權重資料... | 路徑: ${localDataPath}`);
-        const localDataRes = await fetch(localDataPath);
-        if (!localDataRes.ok) throw new Error(`無法讀取本地權重檔: HTTP ${localDataRes.status}`);
-        const localDataBuf = await localDataRes.arrayBuffer();
-        const localExternalData = new Uint8Array(localDataBuf);
+      console.log(`ℹ️ CDN 模型或權重不可用，切換至本地端讀取路徑...`);
+    }
 
-        const localSessionOptions = {
-          executionProviders: executionProviders,
-          graphOptimizationLevel: 'all',
-          enableCpuMemBuffer: true,
-          externalData: [
-            { path: "tsl_model_fold1.onnx.data", data: localExternalData },
-            { path: "./tsl_model_fold1.onnx.data", data: localExternalData }
-          ]
-        };
+    // 後備路徑：本地載入
+    const localOnnxPath = `./train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx`;
+    const localDataPath = `./train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx.data`;
+    
+    try {
+      console.log(`🧠 正在讀取本地 ONNX 外部權重資料... | 路徑: ${localDataPath}`);
+      const localDataRes = await fetch(localDataPath);
+      if (!localDataRes.ok) throw new Error(`無法讀取本地權重檔: HTTP ${localDataRes.status}`);
+      const localDataBuf = await localDataRes.arrayBuffer();
+      const localExternalData = new Uint8Array(localDataBuf);
 
-        this.onnxSession = await ort.InferenceSession.create(localOnnxPath, localSessionOptions);
-        console.log(`✅ 本地 ONNX 手語分類模型與外部權重載入成功！`);
-      } catch (localErr) {
-        console.error(`❌ 本地 ONNX 模型與外部權重載入也失敗:`, localErr);
-      }
+      const localSessionOptions = {
+        executionProviders: executionProviders,
+        graphOptimizationLevel: 'all',
+        enableCpuMemBuffer: true,
+        logSeverityLevel: 3,
+        externalData: [
+          { path: "tsl_model_fold1.onnx.data", data: localExternalData },
+          { path: "./tsl_model_fold1.onnx.data", data: localExternalData }
+        ]
+      };
+
+      this.onnxSession = await ort.InferenceSession.create(localOnnxPath, localSessionOptions);
+      console.log(`✅ 本地 ONNX 手語分類模型與外部權重載入成功！`);
+    } catch (localErr) {
+      console.error(`❌ 嚴重錯誤：CDN 與本地模型權重載入完全失敗:`, localErr);
+      throw localErr; // 真的不行的話才拋出錯誤
     }
   }
 
