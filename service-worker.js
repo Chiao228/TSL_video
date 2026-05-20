@@ -133,32 +133,38 @@ self.addEventListener('fetch', event => {
   const isCdn = url.hostname.includes('jsdelivr.net') || url.hostname.includes('googleapis.com');
 
   if (isSameOrigin || isCdn) {
+    // 🌟 1. 如果本來就是媒體區段 Range 請求，直接走專用的 handleRangeRequest
     if (event.request.headers.get('range')) {
       event.respondWith(handleRangeRequest(event.request));
     } else {
-      // 🌟 重點：移除 { ignoreSearch: true }！讓帶有不同 ?v= 的請求能正確穿透舊快取
-      caches.match(event.request).then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request).then(networkResponse => {
-          if (networkResponse.ok && event.request.method === 'GET') {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              // 將帶有新版號的請求當作新資產存入快取
-              cache.put(event.request, responseToCache);
-            });
+      event.respondWith(
+        caches.match(event.request).then(response => {
+          if (response) {
+            return response; // 快取命中，直接回傳
           }
-          return networkResponse;
-        }).catch(err => {
-          console.error('[Service Worker] 網路請求失敗且無可用快取:', err);
-          return new Response('Offline content not available', { status: 503, statusText: 'Service Unavailable' });
-        });
-      });
+          
+          return fetch(event.request).then(networkResponse => {
+            // 🌟 2. 關鍵防禦機制：檢查回應是否符合快取資格
+            // 如果狀態碼是 206 (Partial Content) 或是影片媒體檔，絕對不要執行 cache.put！
+            const isPartial = networkResponse.status === 206;
+            const isMedia = url.pathname.includes('/videos/') || url.pathname.endsWith('.mp4') || url.pathname.endsWith('.mp3');
+
+            if (networkResponse.ok && event.request.method === 'GET' && !isPartial && !isMedia) {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+            return networkResponse;
+          }).catch(err => {
+            console.error('[Service Worker] 網路請求失敗且無可用快取:', err);
+            return new Response('Offline content not available', { status: 503, statusText: 'Service Unavailable' });
+          });
+        })
+      );
     }
   }
 });
-
 // 處理媒體 Range 請求的防禦性程式碼
 async function handleRangeRequest(request) {
   const cache = await caches.open(CACHE_NAME);
