@@ -3,7 +3,6 @@ const CACHE_NAME = 'tsl-game-cache-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './app.js?v=20260519',
   './app.js',
   './config.js',
   './ai_manager.js',
@@ -43,7 +42,7 @@ const STATIC_ASSETS = [
   './train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx',
   './train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx.data',
 
-  // CDN URLs for external resources to ensure offline capability
+  // CDN URLs
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/ort-wasm-simd-threaded.wasm',
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/ort-wasm-simd-threaded.mjs',
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/ort-wasm-simd-threaded.jsep.wasm',
@@ -56,7 +55,6 @@ const STATIC_ASSETS = [
   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm/vision_wasm_nosimd_internal.js'
 ];
 
-// Difficulty levels map to generate local video paths matching config.js
 const WORD_DIFFICULTY = {
   '不可以': 1, '中午': 1, '公車': 1, '去': 1, '可以': 1,
   '好吃': 1, '有': 1, '有沒有': 1, '你好': 1, '我': 1,
@@ -72,37 +70,42 @@ const WORD_DIFFICULTY = {
   '飲料': 3, '媽媽': 3, '對不起': 3, '幫忙': 3, '蘋果': 3,
 };
 
+// 安全快取輔助函式：避免單一檔案 404 造成整個 Service Worker 掛掉
+async function safePreCache(cache, urls) {
+  for (const url of urls) {
+    try {
+      await cache.add(url);
+    } catch (err) {
+      console.error(`[Service Worker] 無法預先快取資產: ${url}`, err);
+    }
+  }
+}
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async cache => {
-      console.log('[Service Worker] Pre-caching static assets...');
-      await cache.addAll(STATIC_ASSETS);
+      console.log('[Service Worker] 開始安全預先快取靜態資產...');
+      await safePreCache(cache, STATIC_ASSETS);
       
       try {
-        console.log('[Service Worker] Fetching vocabulary list to cache videos...');
+        console.log('[Service Worker] 正在擷取字彙表以快取影片...');
         const response = await fetch('./tsl_vocab_videos.json');
         if (response.ok) {
           const videos = await response.json();
           const videoUrls = videos.map(item => {
             const word = item.word_zh.trim();
             const level = WORD_DIFFICULTY[word] || 1;
-            return `./videos/Level_${level}/${word}.mp4`;
+            // 使用 encodeURIComponent 確保中文檔名在所有伺服器環境（如 GitHub Pages）都能正確對齊 URL
+            return `./videos/Level_${level}/${encodeURIComponent(word)}.mp4`;
           });
-          console.log(`[Service Worker] Pre-caching ${videoUrls.length} videos...`);
-          for (const videoUrl of videoUrls) {
-            try {
-              // Fetch and cache individually to prevent failing the entire install if a file is missing
-              await cache.add(videoUrl);
-            } catch (err) {
-              console.warn(`[Service Worker] Failed to cache video: ${videoUrl}`, err);
-            }
-          }
+          console.log(`[Service Worker] 正在預快取 ${videoUrls.length} 個手語影片...`);
+          await safePreCache(cache, videoUrls);
         }
       } catch (err) {
-        console.error('[Service Worker] Failed to fetch vocabulary video list:', err);
+        console.error('[Service Worker] 擷取手語影片清單失敗:', err);
       }
       
-      console.log('[Service Worker] Pre-caching complete! Force activating...');
+      console.log('[Service Worker] 預快取完成！強制啟用新 Service Worker...');
       return self.skipWaiting();
     })
   );
@@ -114,7 +117,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
+            console.log('[Service Worker] 刪除舊快取:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -126,7 +129,6 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   
-  // Only intercept same-origin requests or specific external CDNs
   const isSameOrigin = url.origin === self.location.origin;
   const isCdn = url.hostname.includes('jsdelivr.net') || url.hostname.includes('googleapis.com');
 
@@ -135,12 +137,12 @@ self.addEventListener('fetch', event => {
       event.respondWith(handleRangeRequest(event.request));
     } else {
       event.respondWith(
-        caches.match(event.request).then(response => {
+        // 加上 ignoreSearch: true，讓 app.js?v=xxx 可以直接命中 app.js 的快取
+        caches.match(event.request, { ignoreSearch: true }).then(response => {
           if (response) {
             return response;
           }
           return fetch(event.request).then(networkResponse => {
-            // Cache new successful requests dynamically
             if (networkResponse.ok && event.request.method === 'GET') {
               const responseToCache = networkResponse.clone();
               caches.open(CACHE_NAME).then(cache => {
@@ -149,7 +151,7 @@ self.addEventListener('fetch', event => {
             }
             return networkResponse;
           }).catch(err => {
-            console.error('[Service Worker] Network request failed and no cache available:', err);
+            console.error('[Service Worker] 網路請求失敗且無可用快取:', err);
             return new Response('Offline content not available', { status: 503, statusText: 'Service Unavailable' });
           });
         })
@@ -158,15 +160,14 @@ self.addEventListener('fetch', event => {
   }
 });
 
-// Helper function to handle media Range requests (for iOS Safari and media seeking)
+// 處理媒體 Range 請求的防禦性程式碼
 async function handleRangeRequest(request) {
   const cache = await caches.open(CACHE_NAME);
-  let response = await cache.match(request);
+  let response = await cache.match(request, { ignoreSearch: true });
   
   if (!response) {
     try {
       response = await fetch(request);
-      // Cache the full response dynamically so it can be sliced on subsequent requests
       if (response.ok && request.method === 'GET') {
         const responseToCache = response.clone();
         cache.put(request, responseToCache);
@@ -180,13 +181,15 @@ async function handleRangeRequest(request) {
   if (!rangeHeader) return response;
   
   try {
+    const rangeMatch = rangeHeader.match(/^bytes=(\d+)-(\d+)?$/);
+    if (!rangeMatch) return response;
+
     const arrayBuffer = await response.arrayBuffer();
-    const bytes = rangeHeader.replace(/bytes=/, '').split('-');
-    const start = parseInt(bytes[0], 10);
-    const end = bytes[1] ? parseInt(bytes[1], 10) : arrayBuffer.byteLength - 1;
+    const start = parseInt(rangeMatch[1], 10);
+    const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : arrayBuffer.byteLength - 1;
     
     const slicedBuffer = arrayBuffer.slice(start, end + 1);
-    const newResponse = new Response(slicedBuffer, {
+    return new Response(slicedBuffer, {
       status: 206,
       statusText: 'Partial Content',
       headers: new Headers({
@@ -196,9 +199,9 @@ async function handleRangeRequest(request) {
         'Accept-Ranges': 'bytes'
       })
     });
-    return newResponse;
   } catch (err) {
-    console.error('[Service Worker] Error processing range request:', err);
-    return response;
+    console.error('[Service Worker] 處理 Range 請求時發生錯誤，後退至網路請求:', err);
+    // 如果因為記憶體不足導致 arrayBuffer 失敗，直接嘗試走網路串流，避免畫面卡死
+    return fetch(request).catch(() => response);
   }
 }
