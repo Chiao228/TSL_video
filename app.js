@@ -57,7 +57,7 @@ let lastPoseDetectTime = 0;
 // -----------------------
 // 3. Onboarding 專屬狀態與全域選擇函數
 // -----------------------
-let onboardingMusicMode = 'default';
+let onboardingMusicMode = '';
 let onboardingDifficultyLevel = '1';
 
 async function handleAudioFile(file, label) {
@@ -170,6 +170,18 @@ function setupEventListeners() {
   document.getElementById('close-tutorial-btn').onclick = () => { document.getElementById('tutorial-modal').style.display = 'none'; };
   document.getElementById('close-history-btn').onclick = () => { document.getElementById('history-modal').style.display = 'none'; };
   document.getElementById('difficulty-select').onchange = updateVocabulary;
+  
+  document.getElementById('pause-btn').onclick = () => window.forcePauseGameFromHTML();
+  document.getElementById('restart-btn').onclick = () => window.forceRestartGameFromHTML();
+  document.getElementById('exit-game-btn').onclick = () => window.forceExitGameFromHTML();
+  
+  const leaderboardRestartBtn = document.getElementById('leaderboard-restart-btn');
+  if (leaderboardRestartBtn) {
+    leaderboardRestartBtn.onclick = () => {
+      document.getElementById('leaderboard-modal').style.display = 'none';
+      window.forceRestartGameFromHTML();
+    };
+  }
 
   const toggleDebugBtn = document.getElementById('toggle-debug-btn');
   if (toggleDebugBtn) {
@@ -192,12 +204,8 @@ function setupEventListeners() {
 
   // 🔥【核心優化】音樂解析完成前，強制封鎖下一步按鈕，杜絕帶空資料強行過關
   document.getElementById('welcome-music-next-btn').onclick = () => {
-    if (isAnalyzing) {
-      alert("⏳ 雷達報告：AI 系統正在全速解析您的作戰音軌頻率，請稍候片刻再點擊下一步！");
-      return;
-    }
-    if (onboardingMusicMode === 'upload' && musicBeats.length === 0) {
-      alert("⚠️ 作戰提示：請先點擊下方虛線框，上傳您的本機音樂檔案以供 AI 分析！");
+    if (isAnalyzing || musicBeats.length === 0) {
+      alert("⚠️ 作戰提示：請先等待音樂解析完畢，或上傳您的本機音樂檔案以供 AI 分析！");
       return;
     }
     document.getElementById('welcome-music-phase').style.display = 'none';
@@ -246,6 +254,29 @@ function setupEventListeners() {
       volumeIcon.textContent = vol === 0 ? '🔈' : vol < 0.5 ? '🔉' : '🔊';
     };
   }
+
+  // Onboarding File Upload
+  const onboardingAudioUpload = document.getElementById('onboardingAudioUpload');
+  const onboardingUploadLabel = document.getElementById('onboarding-upload-label');
+  if (onboardingAudioUpload && onboardingUploadLabel) {
+    onboardingAudioUpload.onchange = (e) => {
+      const file = e.target.files[0];
+      handleAudioFile(file, onboardingUploadLabel);
+    };
+  }
+
+  // Main Screen File Upload
+  const audioUpload = document.getElementById('audioUpload');
+  const audioUploadLabel = document.getElementById('audio-upload-label');
+  if (audioUpload) {
+    audioUpload.onchange = (e) => {
+      const file = e.target.files[0];
+      handleAudioFile(file, audioUploadLabel);
+    };
+  }
+
+  // Initialize loading of default music
+  window.selectOnboardingMusic('default');
 }
 setTimeout(setupEventListeners, 300);
 
@@ -255,7 +286,7 @@ setTimeout(setupEventListeners, 300);
 
 // 🚀 啟動防禦/開始遊戲
 window.forceStartGameFromHTML = function() {
-  console.log("🎯 [HTML 物理破門] 觸發強行啟動！");
+  console.log("🎯 觸發遊戲啟動！");
   if (isAnalyzing || musicBeats.length === 0) return alert("音樂尚未解析完畢，請稍候！");
 
   if (bgmPlayer) {
@@ -291,7 +322,7 @@ function forceAudioContextUnlock() {
 
 // ⏸️ 暫停與繼續 
 window.forcePauseGameFromHTML = function() {
-  console.log("🎯 [HTML 物理破門] 暫停/繼續狀態切換");
+  console.log("🎯 暫停/繼續狀態切換");
   gamePaused = !gamePaused;
   if (bgmPlayer) {
     if (gamePaused) bgmPlayer.pause();
@@ -302,7 +333,7 @@ window.forcePauseGameFromHTML = function() {
 
 // 🔄 重新開始
 window.forceRestartGameFromHTML = function() {
-  console.log("🎯 [HTML 物理破門] 重新開始請求");
+  console.log("🎯 重新開始請求");
   if (!gameStarted || gameOver) {
     performRestartAction();
   } else {
@@ -320,7 +351,7 @@ window.forceRestartGameFromHTML = function() {
 
 // 🚪 結束遊戲任務
 window.forceExitGameFromHTML = function() {
-  console.log("🎯 [HTML 物理破門] 結束遊戲請求");
+  console.log("🎯 結束遊戲請求");
   if (!gameStarted || gameOver) {
     performExitGameAction();
   } else {
@@ -550,8 +581,12 @@ async function showLeaderboard(top10) {
 
 function resetToHome(goToStory = false) {
   initGame();
-  document.getElementById('welcome-modal').style.display = 'flex';
-  document.getElementById('welcome-modal').style.opacity = '1';
+  const welcomeModal = document.getElementById('welcome-modal');
+  if (welcomeModal) {
+    welcomeModal.style.display = 'flex';
+    welcomeModal.style.opacity = '1';
+    welcomeModal.style.pointerEvents = 'auto';
+  }
   if (goToStory) {
     document.getElementById('welcome-story-phase').style.display = 'flex';
     document.getElementById('welcome-rules-phase').style.display = 'none';
@@ -612,6 +647,13 @@ function updateGameState(forceUpdateDOM = false) {
       onboardingMusicNextBtn.style.background = 'linear-gradient(135deg, #555, #333)';
       onboardingMusicNextBtn.style.boxShadow = 'none';
       onboardingMusicNextBtn.innerHTML = '⏳ 音樂作戰頻率解析中，請稍候...';
+    } else if (musicBeats.length === 0) {
+      onboardingMusicNextBtn.disabled = true;
+      onboardingMusicNextBtn.style.cursor = 'not-allowed';
+      onboardingMusicNextBtn.style.opacity = '0.5';
+      onboardingMusicNextBtn.style.background = 'linear-gradient(135deg, #555, #333)';
+      onboardingMusicNextBtn.style.boxShadow = 'none';
+      onboardingMusicNextBtn.innerHTML = onboardingMusicMode === 'upload' ? '🎵 請上傳本機音樂以解析節奏' : '🎵 正在載入預設音樂...';
     } else {
       onboardingMusicNextBtn.disabled = false;
       onboardingMusicNextBtn.style.cursor = 'pointer';
