@@ -1,0 +1,14 @@
+# 忽略 Python 快取與暫存檔
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+*.pth
+
+# 忽略本地排行榜 (防止多玩家提交衝突)
+local_leaderboard.json
+
+# 忽略系統與暫存檔
+.DS_Store
+Thumbs.db

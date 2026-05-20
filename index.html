@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>台灣手語學習遊戲 - Web 版</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            color: #ffffff;
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2);
+            box-shadow: 0 0 20px rgba(0, 204, 255, 0.5) !important;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #top-nav button,
+        #hud-container button {
+            transition: all 0.2s ease-in-out;
+        }
+
+        #status {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 0.8;
+            }
+
+            50% {
+                opacity: 1;
+                text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+            }
+
+            100% {
+                opacity: 0.8;
+            }
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-start;
+            text-align: left;
+            pointer-events: none;
+            font-size: 16px;
+            font-weight: 600;
+            max-width: 500px;
+        }
+
+        #ui-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            pointer-events: auto;
+        }
+
+        #ui p {
+            margin: 0;
+            pointer-events: auto;
+        }
+
+        #ui select {
+            pointer-events: auto;
+        }
+
+        .btn {
+            font-size: 16px;
+            padding: 8px 16px;
+            background: #00aa00;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            pointer-events: auto;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #00dd00;
+        }
+
+        .btn:disabled {
+            background: #666666;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn:disabled:hover {
+            background: #666666;
+        }
+
+        .btn-pause {
+            background: #ff6600;
+        }
+
+        .btn-pause:hover {
+            background: #ff9900;
+        }
+
+        #video {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            width: 320px;
+            height: 180px;
+            border: 2px solid #0f0;
+            z-index: -1;
+            opacity: 0;
+            pointer-events: none;
+            display: block;
+        }
+
+        /* 📱 手機與行動裝置 RWD 響應式優化 */
+        @media (max-width: 768px) {
+
+            /* 讓所有彈窗容器支援垂直滾動，並防止頂部被切掉 */
+            #welcome-modal,
+            #rules-modal,
+            #tutorial-modal,
+            #leaderboard-modal,
+            #result-modal,
+            #restart-confirm-modal,
+            #exit-confirm-modal,
+            #history-modal {
+                overflow-y: auto !important;
+                align-items: flex-start !important;
+                padding: 30px 10px !important;
+                box-sizing: border-box;
+            }
+
+            /* 彈窗內容框居中與縮減內邊距 */
+            #welcome-modal>div,
+            #rules-modal>div,
+            #tutorial-modal>div,
+            #leaderboard-modal>div,
+            #result-modal>div,
+            #restart-confirm-modal>div,
+            #exit-confirm-modal>div,
+            #history-modal>div {
+                margin: auto !important;
+                padding: 25px 20px !important;
+                border-radius: 20px !important;
+                gap: 20px !important;
+                width: 95% !important;
+                max-width: 100% !important;
+            }
+
+            /* 標題字型縮小 */
+            #welcome-modal h1,
+            #rules-modal h2,
+            #tutorial-modal h2,
+            #leaderboard-modal h2,
+            #result-modal h2,
+            #restart-confirm-modal h2,
+            #exit-confirm-modal h2,
+            #history-modal h2 {
+                font-size: 26px !important;
+                margin-bottom: 10px !important;
+            }
+
+            /* 內文字型縮小與內距微調 */
+            #welcome-story-text {
+                font-size: 16px !important;
+                min-height: auto !important;
+                line-height: 1.6 !important;
+            }
+
+            #welcome-rules-phase ul {
+                font-size: 15px !important;
+                gap: 10px !important;
+                padding-left: 20px !important;
+            }
+
+            #welcome-rules-phase div,
+            #welcome-story-phase div,
+            #rules-modal div {
+                padding: 15px !important;
+                font-size: 15px !important;
+            }
+
+            #rules-modal div p {
+                font-size: 15px !important;
+                line-height: 1.5 !important;
+            }
+
+            #rules-modal div strong {
+                font-size: 16px !important;
+            }
+
+            /* 音樂與難度卡片調整 */
+            .music-card {
+                padding: 12px 15px !important;
+                gap: 10px !important;
+            }
+
+            .music-card span {
+                font-size: 24px !important;
+            }
+
+            .music-card h4 {
+                font-size: 15px !important;
+            }
+
+            /* 難度卡片橫排容易擠壓，改為垂直排列或縮減內距 */
+            #welcome-difficulty-phase div[style*="display: flex; gap: 15px;"] {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+
+            .diff-card {
+                padding: 15px 10px !important;
+            }
+
+            .diff-card span {
+                font-size: 24px !important;
+                margin-bottom: 5px !important;
+            }
+
+            .diff-card h4 {
+                font-size: 15px !important;
+            }
+
+            /* 按鈕調整 */
+            #welcome-modal button,
+            #rules-modal button,
+            #tutorial-modal button,
+            #leaderboard-modal button,
+            #result-modal button,
+            #restart-confirm-modal button,
+            #exit-confirm-modal button,
+            #history-modal button {
+                padding: 12px 20px !important;
+                font-size: 16px !important;
+                border-radius: 10px !important;
+            }
+
+            /* 結算頁面欄位與間距 */
+            #result-player-name-container {
+                margin-bottom: 15px !important;
+            }
+
+            #result-player-name {
+                padding: 10px !important;
+                font-size: 16px !important;
+            }
+
+            #result-stats {
+                font-size: 15px !important;
+                padding: 15px !important;
+                margin-bottom: 15px !important;
+            }
+
+            /* 讓主畫面的 HUD 和導覽列在手機上收合或稍微調整大小 */
+            #top-nav {
+                flex-wrap: wrap !important;
+                gap: 5px !important;
+            }
+
+            #top-nav button {
+                padding: 6px 12px !important;
+                font-size: 12px !important;
+            }
+
+            #hud-container {
+                width: 120px !important;
+                height: auto !important;
+                padding: 6px !important;
+                border-radius: 12px !important;
+                right: 10px !important;
+                left: auto !important;
+                top: 88px !important;
+                overflow-y: visible !important;
+                pointer-events: auto !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 4px !important;
+            }
+
+            #hud-container p {
+                font-size: 11px !important;
+                margin: 0 !important;
+            }
+
+            #hud-container button {
+                font-size: 11px !important;
+                padding: 3px !important;
+                margin-bottom: 4px !important;
+            }
+
+            #hud-container span {
+                font-size: 12px !important;
+                width: 16px !important;
+            }
+
+            #hud-container div {
+                gap: 2px !important;
+            }
+
+            #hud-container::-webkit-scrollbar {
+                width: 3px !important;
+            }
+
+            #hud-container::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2) !important;
+                border-radius: 2px !important;
+            }
+
+            #video {
+                width: 120px !important;
+                height: 68px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 🌌 遊戲背景故事與規則歡迎畫面 (點進連結直接顯示，預設純黑背景) -->
+    <div id="welcome-modal"
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000000; z-index: 200000; display: flex; justify-content: center; align-items: center; transition: opacity 0.5s ease; opacity: 1; overflow-y: auto; padding: 20px 10px; box-sizing: border-box;">
+
+        <!-- 自包含的淡入動畫樣式 -->
+        <style>
+            @keyframes fadeInPhase {
+                from {
+                    opacity: 0;
+                    transform: translateY(15px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        </style>
+
+        <div
+            style="background: rgba(15, 22, 42, 0.85); border: 2px solid #00e5ff; box-shadow: 0 0 35px rgba(0, 229, 255, 0.35); padding: clamp(20px, 4vh, 45px) clamp(20px, 5vw, 55px); border-radius: 24px; max-width: 780px; width: 90%; max-height: 90vh; overflow-y: auto; text-align: center; color: white; display: flex; flex-direction: column; gap: clamp(15px, 3vh, 30px); box-sizing: border-box;">
+
+            <!-- 📖 階段一：背景故事畫面 (打字機播放) -->
+            <div id="welcome-story-phase"
+                style="display: flex; flex-direction: column; gap: clamp(15px, 2.5vh, 25px); width: 100%; box-sizing: border-box;">
+                <h1
+                    style="color: #00ff66; margin: 0; font-size: clamp(24px, 4.5vh, 40px); font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(0, 255, 102, 0.4);">
+                    歡迎進入手語保衛戰！</h1>
+
+                <div
+                    style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: clamp(15px, 3vh, 30px); border-radius: 18px; box-sizing: border-box;">
+                    <h3
+                        style="color: #00e5ff; margin-top: 0; font-size: clamp(18px, 3vh, 24px); border-bottom: 1px solid rgba(0, 229, 255, 0.2); padding-bottom: 12px; margin-bottom: 15px;">
+                        🌌 故事背景</h3>
+                    <p id="welcome-story-text"
+                        style="margin: 0; line-height: 1.6; color: #e2e8f0; text-shadow: 0 0 8px rgba(226, 232, 240, 0.45), 0 0 15px rgba(0, 229, 255, 0.25); font-size: clamp(16px, 2.3vh, 22px); font-weight: 500; min-height: 110px; box-sizing: border-box;">
+                        <!-- 這裡會由 app.js 的打字機效果動態填入 -->
+                    </p>
+                </div>
+
+                <button id="welcome-skip-btn"
+                    style="width: 100%; padding: clamp(12px, 2vh, 18px) 30px; font-size: clamp(16px, 2.2vh, 22px); cursor: pointer; background: rgba(255, 255, 255, 0.05); color: #ffffff; border: 1.5px solid rgba(255, 255, 255, 0.2); border-radius: 12px; font-weight: bold; transition: all 0.3s ease; letter-spacing: 1px; box-sizing: border-box;">
+                    ⏭️ 跳過故事
+                </button>
+            </div>
+
+            <!-- 📜 階段三：核心規則畫面 (打字完或跳過故事後進入，點擊按鈕配置音樂) -->
+            <div id="welcome-rules-phase"
+                style="display: none; flex-direction: column; gap: clamp(15px, 2.5vh, 25px); width: 100%; box-sizing: border-box; animation: fadeInPhase 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+                <h1
+                    style="color: #ff9900; margin: 0; font-size: clamp(24px, 4.5vh, 40px); font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(255, 153, 0, 0.4);">
+                    防衛隊作戰守則</h1>
+
+                <div
+                    style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: clamp(15px, 3vh, 30px); border-radius: 18px; box-sizing: border-box;">
+                    <h3
+                        style="color: #00e5ff; margin-top: 0; font-size: clamp(18px, 3vh, 24px); border-bottom: 1px solid rgba(0, 229, 255, 0.2); padding-bottom: 12px; margin-bottom: 15px;">
+                        📜 核心作戰守則</h3>
+                    <ul
+                        style="margin: 0; padding-left: 20px; color: #e2e8f0; font-size: clamp(15px, 2.2vh, 20px); display: flex; flex-direction: column; gap: clamp(8px, 1.2vh, 14px); line-height: 1.6; box-sizing: border-box;">
+                        <li><strong style="color: #00ff66;">🟢 完美擊中：</strong>炸彈落地前比出對應手勢，可在空中消滅它！</li>
+                        <li><strong style="color: #ffeb3b;">⚡ 神速救援：</strong>當炸彈落地的最後一秒縮小期間，比出正確手勢仍可成功救回房屋。</li>
+                        <li><strong style="color: #ff3333;">💥 房屋損毀：</strong>若炸彈完全落地消失則會引爆並炸毀一棟房子。</li>
+                        <li><strong style="color: #00ff66;">🏆 獲勝條件：</strong>炸彈全部施放並清空，且防區內至少有一棟房子存活。</li>
+                        <li><strong style="color: #ff0055;">💀 失敗條件：</strong>當防區內的 10 棟房屋全部被炸毀時，任務即宣告失敗！</li>
+                    </ul>
+                </div>
+
+                <button id="welcome-rules-next-btn"
+                    style="width: 100%; padding: clamp(12px, 2vh, 18px) 30px; font-size: clamp(16px, 2.2vh, 22px); cursor: pointer; background: linear-gradient(135deg, #00ff66, #00b050); color: #050a14; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 255, 102, 0.4); letter-spacing: 1px; box-sizing: border-box;">
+                    下一步：配置作戰音軌 ⏭️
+                </button>
+            </div>
+
+            <!-- 🎵 階段三：選擇作戰音樂 (Music Selection) -->
+            <div id="welcome-music-phase"
+                style="display: none; flex-direction: column; gap: clamp(15px, 2.5vh, 25px); width: 100%; box-sizing: border-box; animation: fadeInPhase 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+                <h1
+                    style="color: #00e5ff; margin: 0; font-size: clamp(24px, 4.5vh, 40px); font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(0, 229, 255, 0.4);">
+                    配置作戰音軌</h1>
+
+                <div
+                    style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: clamp(15px, 3vh, 30px); border-radius: 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: clamp(12px, 2vh, 20px);">
+                    <p style="color: #e2e8f0; font-size: clamp(14px, 2.2vh, 18px); line-height: 1.5; margin: 0;">
+                        防衛隊長，請選擇作戰背景音樂。音樂節奏將直接決定轟炸機的炸彈投擲頻率與作戰節奏！</p>
+
+                    <div style="display: flex; flex-direction: column; gap: clamp(10px, 1.5vh, 15px);">
+                        <!-- 預設音樂卡片 -->
+                        <div id="music-card-default" class="music-card active"
+                            onclick="selectOnboardingMusic('default')"
+                            style="padding: clamp(10px, 1.8vh, 16px) 20px; background: rgba(0, 229, 255, 0.1); border: 2px solid #00e5ff; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 15px; transition: all 0.3s ease; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);">
+                            <span style="font-size: clamp(24px, 3.5vh, 32px);">🎮</span>
+                            <div style="flex: 1; text-align: left;">
+                                <h4 style="margin: 0; color: #00e5ff; font-size: clamp(15px, 2.2vh, 18px);">預設音樂 </h4>
+                            </div>
+                        </div>
+
+                        <!-- 自訂音樂卡片 -->
+                        <div id="music-card-upload" class="music-card" onclick="selectOnboardingMusic('upload')"
+                            style="padding: clamp(10px, 1.8vh, 16px) 20px; background: rgba(255, 255, 255, 0.02); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 15px; transition: all 0.3s ease;">
+                            <span style="font-size: clamp(24px, 3.5vh, 32px);">📤</span>
+                            <div style="flex: 1; text-align: left;">
+                                <h4 style="margin: 0; color: #fff; font-size: clamp(15px, 2.2vh, 18px);">上傳本機音樂</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 上傳專用控制區 (僅在點擊自訂音樂時顯示) -->
+                    <div id="onboarding-upload-area" style="display: none; animation: fadeInPhase 0.4s ease forwards;">
+                        <input type="file" id="onboardingAudioUpload" accept="audio/*" style="display: none;">
+                        <label for="onboardingAudioUpload" id="onboarding-upload-label"
+                            style="display: block; padding: clamp(12px, 2vh, 20px); background: rgba(0,0,0,0.5); border: 2px dashed #00e5ff; border-radius: 10px; text-align: center; cursor: pointer; font-size: clamp(15px, 2vh, 18px); color: #00e5ff; font-weight: bold; transition: all 0.3s ease;">
+                            🎵 點此上傳本機音樂檔案
+                        </label>
+                    </div>
+                </div>
+
+                <button id="welcome-music-next-btn"
+                    style="width: 100%; padding: clamp(12px, 2vh, 18px) 30px; font-size: clamp(16px, 2.2vh, 22px); cursor: pointer; background: linear-gradient(135deg, #00e5ff, #0088cc); color: #050a14; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3); letter-spacing: 1px; box-sizing: border-box;">
+                    下一步：設定作戰難度 ⏭️
+                </button>
+            </div>
+
+            <!-- ⚡ 階段四：選擇作戰難度 (Difficulty Selection) -->
+            <div id="welcome-difficulty-phase"
+                style="display: none; flex-direction: column; gap: clamp(15px, 2.5vh, 25px); width: 100%; box-sizing: border-box; animation: fadeInPhase 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+                <h1
+                    style="color: #ff3366; margin: 0; font-size: clamp(24px, 4.5vh, 40px); font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(255, 51, 102, 0.4);">
+                    設定作戰難度</h1>
+
+                <div
+                    style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: clamp(15px, 3vh, 30px); border-radius: 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: clamp(12px, 2vh, 20px);">
+                    <p style="color: #e2e8f0; font-size: clamp(14px, 2.2vh, 18px); line-height: 1.5; margin: 0;">
+                        防衛隊長，請設定 AI
+                        辨識系統的靈敏度與作戰難度。高難度將解鎖更多手語詞彙組合！</p>
+
+                    <div style="display: flex; gap: clamp(8px, 1.2vw, 15px); width: 100%; box-sizing: border-box;">
+                        <!-- 簡易 -->
+                        <div id="diff-card-1" class="diff-card active" onclick="selectOnboardingDifficulty('1')"
+                            style="flex: 1; padding: clamp(12px, 2vh, 25px) clamp(8px, 1vw, 15px); background: rgba(46, 204, 113, 0.1); border: 2px solid #2ecc71; border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.3s ease; box-shadow: 0 0 15px rgba(46, 204, 113, 0.2);">
+                            <span
+                                style="font-size: clamp(24px, 3.5vh, 36px); display: block; margin-bottom: clamp(5px, 1vh, 10px);">⭐</span>
+                            <h4 style="margin: 0; color: #2ecc71; font-size: clamp(14px, 2.2vh, 19px);">等級 1 (簡易)</h4>
+                        </div>
+
+                        <!-- 中等 -->
+                        <div id="diff-card-2" class="diff-card" onclick="selectOnboardingDifficulty('2')"
+                            style="flex: 1; padding: clamp(12px, 2vh, 25px) clamp(8px, 1vw, 15px); background: rgba(255, 255, 255, 0.02); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.3s ease;">
+                            <span
+                                style="font-size: clamp(24px, 3.5vh, 36px); display: block; margin-bottom: clamp(5px, 1vh, 10px);">⭐⭐</span>
+                            <h4 style="margin: 0; color: #fff; font-size: clamp(14px, 2.2vh, 19px);">等級 2 (中等)</h4>
+                        </div>
+
+                        <!-- 困難 -->
+                        <div id="diff-card-3" class="diff-card" onclick="selectOnboardingDifficulty('3')"
+                            style="flex: 1; padding: clamp(12px, 2vh, 25px) clamp(8px, 1vw, 15px); background: rgba(255, 255, 255, 0.02); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.3s ease;">
+                            <span
+                                style="font-size: clamp(24px, 3.5vh, 36px); display: block; margin-bottom: clamp(5px, 1vh, 10px);">⭐⭐⭐</span>
+                            <h4 style="margin: 0; color: #fff; font-size: clamp(14px, 2.2vh, 19px);">等級 3 (困難)</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="welcome-difficulty-start-btn"
+                    style="width: 100%; padding: clamp(14px, 2.2vh, 22px) 30px; font-size: clamp(18px, 2.4vh, 24px); cursor: pointer; background: linear-gradient(135deg, #ff3366, #ff0055); color: #ffffff; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(255, 51, 102, 0.4); letter-spacing: 2px; box-sizing: border-box; text-shadow: 0 0 5px rgba(255,255,255,0.5);">
+                    🚀 啟動防禦系統 (開始遊戲)
+                </button>
+            </div>
+
+        </div>
+    </div>
+    <div id="ui">
+        <div id="ui-row">
+            <!-- 🛸 頂部導覽列 -->
+            <div id="top-nav"
+                style="position: fixed; top: 15px; left: 15px; display: flex; gap: 10px; z-index: 1000; align-items: center; pointer-events: auto;">
+                <select id="difficulty-select"
+                    style="display: none; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.8); color: #00ccff; border: 1px solid #00ccff; cursor: pointer; font-weight: bold; backdrop-filter: blur(5px); outline: none;">
+                    <option value="1" selected>⭐ 等級 1 (簡易)</option>
+                    <option value="2">⭐⭐ 等級 2 (中等)</option>
+                    <option value="3">⭐⭐⭐ 等級 3 (困難)</option>
+                </select>
+                <button id="start-btn"
+                    style="padding: 10px 20px; border-radius: 8px; background: linear-gradient(to bottom, #2ecc71, #27ae60); color: #fff; border: none; font-weight: bold; cursor: pointer; display: none; box-shadow: 0 4px 15px rgba(46,204,113,0.3);">開始遊戲</button>
+                <button id="pause-btn"
+                    style="padding: 10px 20px; border-radius: 8px; background: #3498db; color: #fff; border: none; font-weight: bold; cursor: pointer; display: none;">暫停</button>
+                <button id="restart-btn"
+                    style="padding: 10px 20px; border-radius: 8px; background: #e74c3c; color: #fff; border: none; font-weight: bold; cursor: pointer; display: none;">重新開始</button>
+                <button id="exit-game-btn"
+                    style="padding: 10px 20px; border-radius: 8px; background: linear-gradient(135deg, #ff3366, #ff0055); color: #fff; border: none; font-weight: bold; cursor: pointer; display: none; box-shadow: 0 4px 15px rgba(255,51,102,0.3);">結束遊戲</button>
+                <button id="tutorial-btn"
+                    style="padding: 10px 20px; border-radius: 8px; background: rgba(153,51,204,0.8); color: white; border: none; font-weight: bold; cursor: pointer; backdrop-filter: blur(5px);">遊戲教學</button>
+                <button id="rules-btn"
+                    style="padding: 10px 20px; border-radius: 8px; background: rgba(255,153,0,0.8); color: white; border: none; font-weight: bold; cursor: pointer; backdrop-filter: blur(5px);">遊戲規則</button>
+                <button id="toggle-debug-btn"
+                    style="padding: 10px 20px; border-radius: 8px; background: rgba(0, 172, 193, 0.8); color: white; border: none; font-weight: bold; cursor: pointer; backdrop-filter: blur(5px);">📊
+                    隱藏偵測資訊</button>
+                <!-- 🔊 音量控制 -->
+                <div id="volume-control-container" style="display: flex; align-items: center; gap: 8px; background: rgba(10, 15, 30, 0.6); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; backdrop-filter: blur(5px); font-family: system-ui, -apple-system, sans-serif;">
+                    <span id="volume-icon" style="font-size: 16px; cursor: pointer; user-select: none;">🔊</span>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.1" style="width: 80px; accent-color: #00ccff; cursor: pointer; height: 5px; border-radius: 3px; outline: none; background: rgba(255,255,255,0.2);">
+                    <span id="volume-value" style="font-size: 13px; font-weight: bold; width: 32px; text-align: right; color: #00e5ff;">10%</span>
+                </div>
+            </div>
+
+            <!-- 📊 右側 HUD 面板 (深空磨砂版，移至視訊畫面下方，與視訊鏡頭同寬) -->
+            <div id="hud-container"
+                style="position: fixed; top: 200px; right: 10px; background: rgba(10, 15, 30, 0.4); backdrop-filter: blur(15px); padding: 15px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; width: 320px; height: auto; box-sizing: border-box; pointer-events: none; z-index: 900; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 8px;">
+
+                <!-- 🎧 隱藏的音訊元件 (供引導精靈與後台播放/解析，主遊玩畫面保持最精簡) -->
+                <input type="file" id="audioUpload" accept="audio/*" style="display: none;">
+                <label id="audio-upload-label" style="display: none;"></label>
+                <audio id="bgmPlayer" style="display: none;"></audio>
+                <select id="musicSelect" style="display: none;">
+                    <option value="default" selected></option>
+                    <option value="upload"></option>
+                </select>
+
+                <button id="history-btn"
+                    style="width: 100%; padding: 4px; border-radius: 8px; background: linear-gradient(135deg, #00b8d4, #00e5ff); color: #000; border: none; font-weight: bold; cursor: pointer; pointer-events: auto; font-size: 16px; margin-bottom: 2px;">📜
+                    遊玩紀錄</button>
+
+                <p id="status" style="margin: 0; font-weight: bold; color: #ffeb3b; font-size: 16px; line-height: 1.3;">
+                    狀態: 準備中</p>
+
+                <div style="display: flex; flex-direction: column; gap: 3px; pointer-events: auto;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px; width: 24px; text-align: center;">💰</span>
+                        <p id="score"
+                            style="margin: 0; font-size: 18px; font-weight: bold; color: #00ff00; text-shadow: 0 0 10px rgba(0,255,0,0.3);">
+                            得分: 0</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px; width: 24px; text-align: center;">🏠</span>
+                        <p id="house-count" style="margin: 0; font-size: 18px; color: #ff9800; font-weight: bold;">房子:
+                            10</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px; width: 24px; text-align: center;">🔥</span>
+                        <p id="difficulty-display"
+                            style="margin: 0; font-size: 18px; color: #4fc3f7; font-weight: bold;">難度: 全部</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px; width: 24px; text-align: center;">💣</span>
+                        <p id="life" style="margin: 0; font-size: 18px; color: #f352ff; font-weight: bold;">已掉落: 0/15
+                        </p>
+                    </div>
+                    <p id="progress"
+                        style="margin: 2px 0 0 0; font-size: 16px; color: #ffeb3b; font-style: italic; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px; font-weight: bold; text-shadow: 0 0 5px rgba(255,235,59,0.3); line-height: 1.3;">
+                        進度: 等待中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <video id="video" autoplay playsinline muted></video>
+
+    <!-- ONNX Runtime Web (優先使用本機以支援離線，失敗時自動使用 CDN 備份) -->
+    <script src="ort.min.js"
+        onerror="this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js';"></script>
+
+    <!-- 138 維特徵提取 (從 features_holistic.py 轉換) -->
+    <script src="holistic_features.js"></script>
+
+    <!-- MediaPipe Tasks Vision (ES Module) + 主程式 -->
+    <script type="module" src="./app.js?v=20260519"></script>
+
+    <div id="leaderboard-modal" onclick="if(event.target === this) this.style.display='none';"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(8px); cursor: pointer;">
+        <div
+            style="background: #111; padding: 30px; border-radius: 15px; border: 3px solid #0f0; width: 85%; max-width: 400px; text-align: center; color: white; box-shadow: 0 0 20px rgba(0,255,0,0.5);">
+            <h2 style="color: #0f0; margin-top: 0; font-size: 28px;">🌍 全球排行榜 🌍</h2>
+
+            <ul id="leaderboard-list"
+                style="list-style: none; padding: 0; margin: 20px 0; max-height: 300px; overflow-y: auto;">
+            </ul>
+
+            <div style="display: flex; gap: 15px; width: 100%; box-sizing: border-box;">
+                <button id="close-leaderboard-btn"
+                    onclick="document.getElementById('leaderboard-modal').style.display='none';"
+                    style="flex: 1; padding: 15px; font-size: 18px; cursor: pointer; background: rgba(255,255,255,0.05); color: #fff; border: 1.5px solid rgba(255,255,255,0.2); border-radius: 10px; font-weight: bold; pointer-events: auto !important;">
+                    關閉視窗
+                </button>
+                <button id="leaderboard-restart-btn"
+                    style="flex: 1; padding: 15px; font-size: 18px; cursor: pointer; background: linear-gradient(135deg, #00ff66, #00b050); color: #050a14; border: none; border-radius: 10px; font-weight: bold; pointer-events: auto !important; box-shadow: 0 4px 15px rgba(0, 255, 102, 0.4);">
+                    🎮 再玩一次
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 遊戲教學彈窗 (僅顯示影片清單) -->
+    <div id="tutorial-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100000; justify-content: center; align-items: center; flex-direction: column; pointer-events: auto; backdrop-filter: blur(10px); overflow-y: auto; padding: 20px 10px; box-sizing: border-box;">
+        <div
+            style="background: rgba(15, 22, 42, 0.9); border: 2.5px solid #cc99ff; padding: clamp(20px, 3.5vh, 40px) clamp(20px, 4vw, 45px); border-radius: 24px; max-width: 680px; width: 90%; height: 80vh; max-height: 700px; text-align: left; color: white; box-shadow: 0 0 35px rgba(204, 153, 255, 0.35); pointer-events: auto; display: flex; flex-direction: column; gap: clamp(12px, 2vh, 20px); box-sizing: border-box; animation: fadeInPhase 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+            <h2
+                style="color: #cc99ff; text-align: center; margin-top: 0; font-size: clamp(22px, 3.8vh, 34px); font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(204, 153, 255, 0.4);">
+                📚 手語詞彙教學</h2>
+
+            <div id="tutorial-vocab-list"
+                style="flex: 1; overflow-y: auto; background: rgba(0, 0, 0, 0.5); padding: 15px 20px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.08); margin: 0; font-size: clamp(14px, 1.8vh, 18px); box-sizing: border-box;">
+                正在載入影片清單...
+            </div>
+
+            <button id="close-tutorial-btn"
+                style="width: 100%; padding: clamp(12px, 2vh, 18px) 30px; font-size: clamp(16px, 2.2vh, 22px); cursor: pointer; background: linear-gradient(135deg, #cc99ff, #9933cc); color: white; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(153, 51, 204, 0.4); letter-spacing: 1px; box-sizing: border-box;">
+                返回遊戲
+            </button>
+        </div>
+    </div>
+    <!-- 遊戲規則彈窗 -->
+    <div id="rules-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100000; justify-content: center; align-items: center; flex-direction: column; pointer-events: auto; backdrop-filter: blur(10px); overflow-y: auto; padding: 20px 10px; box-sizing: border-box;">
+        <div
+            style="background: rgba(15, 22, 42, 0.9); border: 2.5px solid #ff9900; padding: clamp(20px, 3.5vh, 40px) clamp(20px, 4vw, 45px); border-radius: 24px; max-width: 650px; width: 90%; max-height: 80vh; overflow-y: auto; text-align: left; color: white; box-shadow: 0 0 35px rgba(255, 153, 0, 0.35); pointer-events: auto; display: flex; flex-direction: column; gap: clamp(12px, 2vh, 20px); box-sizing: border-box; animation: fadeInPhase 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+            <h2
+                style="color: #ff9900; text-align: center; margin-top: 0; font-size: clamp(22px, 3.8vh, 34px); font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(255, 153, 0, 0.4);">
+                📜 遊戲規則 📜</h2>
+
+            <div
+                style="margin: 0; font-size: clamp(14px, 1.8vh, 18px); line-height: 1.6; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); padding: clamp(15px, 2vh, 25px); border-radius: 20px; box-sizing: border-box; flex: 1; overflow-y: auto;">
+                <p style="margin-top: 0; margin-bottom: 12px;"><strong
+                        style="font-size: clamp(15px, 2vh, 20px); color: #00ff66;">🟢 完美擊中 (Perfect)：</strong><br>
+                    在炸彈<strong>落地前</strong>比出對應手語，直接在空中消滅炸彈！
+                </p>
+                <p style="margin-bottom: 12px;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #ffeb3b;">⚡
+                        神速救援 (Last Second)：</strong><br>
+                    炸彈落地<strong>開始縮小</strong>期間，<strong>比出正確手語</strong>仍可成功救回房屋！
+                </p>
+                <p style="margin-bottom: 12px;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #ff3333;">💥
+                        房屋損毀 (Bomb Explode)：</strong><br>
+                    炸彈<strong>完全縮小消失</strong>後就會爆炸，並<strong>炸毀距離最低的一棟房屋</strong>。
+                </p>
+                <p style="margin-bottom: 12px;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #e100fffc;">🏁
+                        遊戲結束條件 (Game End)：</strong><br>
+                    • <strong style="color: #00ff66;">🏆 獲勝：</strong>所有音軌炸彈全部施放並清空，且畫面上留有<strong>至少 1 棟</strong>房屋。<br>
+                    • <strong style="color: #ff3333;">💀 失敗：</strong>當地面上的 <strong>10 棟房屋全毀</strong>時，任務即失敗。
+                </p>
+                <p style="margin-bottom: 0;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #00e5ff;">💰
+                        計分規則：</strong><br>
+                    • 完美擊中：⭐+50 / ⭐⭐+100 / ⭐⭐⭐+150<br>
+                    • 神速救援：上述得分 <strong>-10 分</strong> (但可保住房子)<br>
+                    • 結算獎勵：每剩餘一棟房子 <strong>+200 分</strong>。
+                </p>
+            </div>
+
+            <button id="close-rules-btn"
+                style="width: 100%; padding: clamp(12px, 2vh, 18px) 30px; font-size: clamp(16px, 2.2vh, 22px); cursor: pointer; background: linear-gradient(135deg, #ffcc00, #ff9900); color: #050a14; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 153, 0, 0.4); letter-spacing: 1px; box-sizing: border-box;">
+                知道了！
+            </button>
+        </div>
+    </div>
+    <!-- 🕒 遊戲歷史紀錄彈窗 (個人紀錄) -->
+    <div id="history-modal" onclick="if(event.target === this) this.style.display='none';"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; backdrop-filter: blur(8px); cursor: pointer;">
+        <div
+            style="background: #1a1a1a; width: 90%; max-width: 450px; border-radius: 20px; padding: 30px; border: 2px solid #ff9900; box-shadow: 0 0 30px rgba(255,153,0,0.3); color: #fff; position: relative; max-height: 80vh; display: flex; flex-direction: column; cursor: default;">
+            <h2 style="margin-top: 0; text-align: center; color: #ff9900; font-size: 28px;">🕒 遊玩歷史</h2>
+            <div id="history-list-container"
+                style="overflow-y: auto; flex-grow: 1; margin: 20px 0; padding-right: 10px;">
+                <!-- 這裡會由 JS 填入紀錄 -->
+                <p style="text-align: center; color: #888;">尚無遊玩紀錄</p>
+            </div>
+            <button id="close-history-btn" onclick="document.getElementById('history-modal').style.display='none';"
+                style="background: #00cc99; color: #fff; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; pointer-events: auto !important;">
+                關閉視窗
+            </button>
+        </div>
+    </div>
+    <!-- 🌟 結算彈窗 (自訂 UI) -->
+    <div id="result-modal" class="modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 150000; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
+        <div class="modal-content"
+            style="background: #1a1a1a; width: 90%; max-width: 400px; border-radius: 20px; padding: 30px; border: 2px solid #ffcc00; box-shadow: 0 0 30px rgba(255,204,0,0.3); color: #fff; text-align: center;">
+            <h2 id="result-title" style="font-size: 32px; margin: 0 0 20px 0; color: #ffcc00;">🏆 任務成功</h2>
+            <div id="result-stats"
+                style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; margin-bottom: 25px; line-height: 1.8; text-align: left; font-size: 18px; border: 1px solid #333;">
+                <!-- 這裡由 JS 動態填入 -->
+            </div>
+            <!-- ✍️ 隊長姓名輸入欄位 (回歸結算畫面輸入) -->
+            <div id="result-player-name-container"
+                style="margin-bottom: 20px; text-align: left; display: flex; flex-direction: column; gap: 8px;">
+                <label for="result-player-name" style="font-size: 16px; color: #ffcc00; font-weight: bold;">✍️
+                    防衛隊長名稱：</label>
+                <input type="text" id="result-player-name" placeholder="請輸入您的名稱以登錄..." value="防衛隊長"
+                    style="width: 100%; padding: 12px 15px; font-size: 18px; background: rgba(0,0,0,0.6); border: 2px solid #ffcc00; border-radius: 10px; color: #fff; font-weight: bold; outline: none; box-sizing: border-box; text-align: center; transition:w: 0 0 15px rgba(46, 204, 113, 0.2);">
+                <!-- 雲端與本地選擇 -->
+                <div style="margin-bottom: 20px; text-align: left; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="result-upload-cloud" checked
+                        style="width: 20px; height: 20px; cursor: pointer;">
+                    <label for="result-upload-cloud"
+                        style="font-size: 18px; color: #e2e8f0; cursor: pointer;">上傳至雲端排行榜</label>
+                </div>
+
+                <button id="result-submit-btn"
+                    style="background: #ffcc00; color: #000; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 20px; transition: all 0.2s;">
+                    確認並送出成績
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔄 重新開始確認彈窗 -->
+    <div id="restart-confirm-modal" onclick="if(event.target === this) this.style.display='none';"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; backdrop-filter: blur(10px); cursor: pointer;">
+        <div
+            style="background: rgba(15, 22, 42, 0.9); padding: 45px 50px; border-radius: 32px; border: 2.5px solid #ff3333; width: 85%; max-width: 780px; text-align: center; color: white; box-shadow: 0 0 35px rgba(255,51,51,0.35); cursor: default; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; animation: fadeInPhase 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+            <h2
+                style="color: #ff3333; margin-top: 0; font-size: 42px; font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(255, 51, 51, 0.4);">
+                🔄 確定要重新開始？</h2>
+            <p style="color: #e2e8f0; margin: 15px 0 25px 0; font-size: 23px; line-height: 1.7; font-weight: 500;">
+                目前的所有得分與任務進度將會遺失喔！</p>
+            <div style="display: flex; gap: 20px; width: 100%; box-sizing: border-box;">
+                <button id="restart-cancel-btn"
+                    style="flex: 1; padding: 20px 30px; font-size: 22px; cursor: pointer; background: rgba(255, 255, 255, 0.05); color: white; border: 1.5px solid rgba(255, 255, 255, 0.2); border-radius: 12px; font-weight: bold; transition: all 0.3s ease; pointer-events: auto !important; letter-spacing: 1px;">先不要</button>
+                <button id="restart-confirm-btn"
+                    style="flex: 1; padding: 20px 30px; font-size: 22px; cursor: pointer; background: linear-gradient(135deg, #ff6666, #ff3333); color: white; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 51, 51, 0.4); pointer-events: auto !important; letter-spacing: 1px;">確定重來</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🚪 結束遊戲確認彈窗 -->
+    <div id="exit-confirm-modal" onclick="if(event.target === this) this.style.display='none';"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; backdrop-filter: blur(10px); cursor: pointer;">
+        <div
+            style="background: rgba(15, 22, 42, 0.9); padding: 45px 50px; border-radius: 32px; border: 2.5px solid #ff3366; width: 85%; max-width: 780px; text-align: center; color: white; box-shadow: 0 0 35px rgba(255,51,102,0.35); cursor: default; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; animation: fadeInPhase 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+            <h2
+                style="color: #ff3366; margin-top: 0; font-size: 42px; font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 15px rgba(255, 51, 102, 0.4);">
+                🚪 確定要結束遊戲？</h2>
+            <p style="color: #e2e8f0; margin: 15px 0 25px 0; font-size: 23px; line-height: 1.7; font-weight: 500;">
+                結束後將放棄當前防衛任務，並重新返回故事背景喔！</p>
+            <div style="display: flex; gap: 20px; width: 100%; box-sizing: border-box;">
+                <button id="exit-cancel-btn"
+                    style="flex: 1; padding: 20px 30px; font-size: 22px; cursor: pointer; background: rgba(255, 255, 255, 0.05); color: white; border: 1.5px solid rgba(255, 255, 255, 0.2); border-radius: 12px; font-weight: bold; transition: all 0.3s ease; pointer-events: auto !important; letter-spacing: 1px;">繼續防衛</button>
+                <button id="exit-confirm-btn"
+                    style="flex: 1; padding: 20px 30px; font-size: 22px; cursor: pointer; background: linear-gradient(135deg, #ff3366, #ff0055); color: white; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.4); pointer-events: auto !important; letter-spacing: 1px;">確定結束</button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
