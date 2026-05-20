@@ -753,7 +753,7 @@ async function initWebcam() {
     video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 180 } });
     await video.play();
     lastVideoFrame = video;
-    ();
+    predictLoop();
   } catch (err) {
     alert("相機啟動失敗: " + err.message);
   }
