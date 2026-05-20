@@ -187,7 +187,7 @@
 </head>
 
 <body>
-    <!-- 🔥【關鍵修復】優化 z-index 以及大型空氣牆遮罩阻擋問題 -->
+    <!-- 🛡️ z-index 調整至 2000，點擊後會由 JS 瞬間切斷，根絕 200000 幽靈空氣牆死鎖 -->
     <div id="welcome-modal"
         style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000000; z-index: 2000; display: flex; justify-content: center; align-items: center; transition: opacity 0.3s ease; opacity: 1; overflow-y: auto; padding: 20px 10px; box-sizing: border-box;">
 
@@ -240,8 +240,7 @@
                     <p style="color: #e2e8f0; font-size: clamp(14px, 2.2vh, 18px); line-height: 1.5; margin: 0;">
                         防衛隊長，請選擇作戰背景音樂。音樂節奏將直接決定轟炸機的炸彈投擲頻率與作戰節奏！</p>
                     <div style="display: flex; flex-direction: column; gap: clamp(10px, 1.5vh, 15px);">
-                        <div id="music-card-default" class="music-card active" auto-focus
-                            onclick="selectOnboardingMusic('default')"
+                        <div id="music-card-default" class="music-card active" onclick="selectOnboardingMusic('default')"
                             style="padding: clamp(10px, 1.8vh, 16px) 20px; background: rgba(0, 229, 255, 0.1); border: 2px solid #00e5ff; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 15px; transition: all 0.3s ease; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);">
                             <span style="font-size: clamp(24px, 3.5vh, 32px);">🎮</span>
                             <div style="flex: 1; text-align: left;">
@@ -293,9 +292,10 @@
                         </div>
                     </div>
                 </div>
-                <!-- 🌟 加上內聯點擊事件，不給 JS 任何脫鉤的機會！ -->
-                <button id="welcome-difficulty-start-btn" onclick="window.forceStartGameFromHTML()" style="...">
-                🚀 啟動防禦系統 (開始遊戲)
+                <!-- 🌟 採用 Inline 物理破門，防止非同步 JS 阻塞失靈 -->
+                <button id="welcome-difficulty-start-btn" onclick="window.forceStartGameFromHTML()"
+                    style="width: 100%; padding: clamp(14px, 2.2vh, 22px) 30px; font-size: clamp(18px, 2.4vh, 24px); cursor: pointer; background: linear-gradient(135deg, #ff3366, #ff0055); color: #ffffff; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(255, 51, 102, 0.4); letter-spacing: 2px; box-sizing: border-box; text-shadow: 0 0 5px rgba(255,255,255,0.5);">
+                    🚀 啟動防禦系統 (開始遊戲)
                 </button>
             </div>
 
@@ -310,7 +310,6 @@
                     <option value="2">⭐⭐ 等級 2 (中等)</option>
                     <option value="3">⭐⭐⭐ 等級 3 (困難)</option>
                 </select>
-                <!-- 🔥【關鍵修復】給予主控制按鈕更高的 z-index（1010），確保它們可以穿透任何殘留遮罩進行點擊 -->
                 <button id="start-btn" style="padding: 10px 20px; border-radius: 8px; background: linear-gradient(to bottom, #2ecc71, #27ae60); color: #fff; border: none; font-weight: bold; cursor: pointer; display: none; box-shadow: 0 4px 15px rgba(46,204,113,0.3); z-index: 1010; pointer-events: auto;">開始遊戲</button>
                 <button id="pause-btn" style="padding: 10px 20px; border-radius: 8px; background: #3498db; color: #fff; border: none; font-weight: bold; cursor: pointer; display: none; z-index: 1010; pointer-events: auto;">暫停</button>
                 <button id="restart-btn" style="padding: 10px 20px; border-radius: 8px; background: #e74c3c; color: #fff; border: none; font-weight: bold; cursor: pointer; display: none; z-index: 1010; pointer-events: auto;">重新開始</button>
@@ -396,7 +395,7 @@
                 <p style="margin-bottom: 12px;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #ffeb3b;">⚡ 神速救援 (Last Second)：</strong><br>炸彈落地<strong>開始縮小</strong>期間，<strong>比出正確手語</strong>仍可成功救回房屋！</p>
                 <p style="margin-bottom: 12px;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #ff3333;">💥 房屋損毀 (Bomb Explode)：</strong><br>炸彈<strong>完全縮小消失</strong>後就會爆炸，並<strong>炸毀距離最低的一棟房屋</strong>。</p>
                 <p style="margin-bottom: 12px;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #e100fffc;">🏁 遊戲結束條件 (Game End)：</strong><br>• <strong style="color: #00ff66;">🏆 獲勝：</strong>所有音軌炸彈全部施放並清空，且畫面上留有<strong>至少 1 棟</strong>房屋。<br>• <strong style="color: #ff3333;">💀 失敗：</strong>當地面上的 <strong>10 棟房屋全毀</strong>時，任務即失敗。</p>
-                <p style="margin-bottom: 0;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #00e5ff;">💰 計分規則：</strong><br>• 完美擊中：⭐+50 / ⭐⭐+100 / ⭐⭐⭐+150<br>• 神速救援：上述得分 <strong>-10 分</strong> (但可保住房子)<br>• 結算獎勵：每剩餘一棟房子 <strong>+200 分</strong>。</p>
+                <p style="margin-bottom: 0;"><strong style="font-size: clamp(15px, 2vh, 20px); color: #00e5ff;">💰 計分規則：</strong><br>• 完美擊中：⭐+50 / ⭐邊++100 / ⭐⭐⭐+150<br>• 神速救援：上述得分 <strong>-10 分</strong> (但可保住房子)<br>• 結算獎勵：每剩餘一棟房子 <strong>+200 分</strong>。</p>
             </div>
             <button id="close-rules-btn" style="width: 100%; padding: clamp(12px, 2vh, 18px) 30px; font-size: clamp(16px, 2.2vh, 22px); cursor: pointer; background: linear-gradient(135deg, #ffcc00, #ff9900); color: #050a14; border: none; border-radius: 12px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 153, 0, 0.4); letter-spacing: 1px; box-sizing: border-box;">知道了！</button>
         </div>
