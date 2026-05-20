@@ -753,7 +753,7 @@ async function initWebcam() {
     video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 180 } });
     await video.play();
     lastVideoFrame = video;
-    predictLoop();
+    ();
   } catch (err) {
     alert("相機啟動失敗: " + err.message);
   }
@@ -764,67 +764,64 @@ async function predictLoop() {
     const ts = performance.now();
     frameCount++;
 
-    // 🔥【效能優化 3】降載 MediaPipe 手部追蹤：若上一幀沒抓到手，維持一秒60幀急速捕捉；
-    // 一旦累積了特徵，可以微幅降載至每 2 幀才對影格呼叫一次 detectForVideo，降低 CPU 負載！
-    const handSkipFrame = (featureBuffer.length > 0) ? 2 : 1;
-
-    if (frameCount % handSkipFrame === 0) {
-      const handRes = aiManager.handLandmarker.detectForVideo(lastVideoFrame, ts);
-      
-      // 🔥【效能優化 4】將 Pose 偵測從「算影格數」改為精準的「時間節流」：每 250 毫秒才呼叫一次
-      if (ts - lastPoseDetectTime > 250 || !lastPoseRes) {
-        lastPoseRes = aiManager.poseLandmarker.detectForVideo(lastVideoFrame, ts);
-        lastPoseDetectTime = ts;
-      }
-
-      const landmarks = handRes.landmarks || [];
-      const destructuredHandedness = handRes.handednesses || [];
-
-      if (landmarks.length > 0) {
-        lastHandLandmarks = landmarks;
-        handMissFrameCount = 0;
-
-        let leftHand = null, rightHand = null;
-        landmarks.forEach((lm, idx) => {
-          const sideLabel = destructuredHandedness[idx]?.[0]?.categoryName || "";
-          if (sideLabel === 'Left') leftHand = lm;
-          else if (sideLabel === 'Right') rightHand = lm;
-        });
-
-        // 呼叫優化後無 GC 負擔的 extractFrame66
-        const frame = window.extractFrame66({
-          leftHandLandmarks: leftHand,
-          rightHandLandmarks: rightHand,
-          poseLandmarks: lastPoseRes?.landmarks?.[0] || null
-        });
-
-        featureBuffer.push(frame);
-        if (featureBuffer.length > MODEL_FRAMES) featureBuffer.shift();
-
-        if (featureBuffer.length === MODEL_FRAMES && inferenceCooldown <= 0) {
-          inferenceFrameCount++;
-          // 每 3 幀滑動滑窗執行 ONNX 模型推論
-          if (inferenceFrameCount % 3 === 0 && !isInferencing) {
-            isInferencing = true;
-            aiManager.runInference(featureBuffer, labelMap, currentVocabulary).then(res => {
-              isInferencing = false;
-              if (res) {
-                lastDebugInfo = res;
-                checkHit(res.label, res.confidence);
-              }
-            }).catch(() => { isInferencing = false; });
-          }
-        }
-      } else {
-        lastHandLandmarks = null;
-        handMissFrameCount++;
-        if (handMissFrameCount > HAND_PERSISTENCE_FRAMES) {
-          featureBuffer = []; 
-          disabledHitLabel = ""; 
-        }
-      }
-      if (inferenceCooldown > 0) inferenceCooldown--;
+    // 🔥【極速修正 1】手部視覺追蹤絕不跳影格！維持一秒 60 次全速捕捉，確保視覺百分之百即時跟手
+    const handRes = aiManager.handLandmarker.detectForVideo(lastVideoFrame, ts);
+    
+    // 姿勢偵測（原點校正）維持精準時間節流，每 250 毫秒跑一次就夠了
+    if (ts - lastPoseDetectTime > 250 || !lastPoseRes) {
+      lastPoseRes = aiManager.poseLandmarker.detectForVideo(lastVideoFrame, ts);
+      lastPoseDetectTime = ts;
     }
+
+    const landmarks = handRes.landmarks || [];
+    const destructuredHandedness = handRes.handednesses || [];
+
+    if (landmarks.length > 0) {
+      // 🌟 關鍵：當前影格一抓到點，立刻同步更新到全域視覺變數，讓畫布能在 16ms 內即時渲染骨架
+      lastHandLandmarks = landmarks;
+      handMissFrameCount = 0;
+
+      let leftHand = null, rightHand = null;
+      landmarks.forEach((lm, idx) => {
+        const sideLabel = destructuredHandedness[idx]?.[0]?.categoryName || "";
+        if (sideLabel === 'Left') leftHand = lm;
+        else if (sideLabel === 'Right') rightHand = lm;
+      });
+
+      // 提取無記憶體垃圾的 66 維特徵
+      const frame = window.extractFrame66({
+        leftHandLandmarks: leftHand,
+        rightHandLandmarks: rightHand,
+        poseLandmarks: lastPoseRes?.landmarks?.[0] || null
+      });
+
+      featureBuffer.push(frame);
+      if (featureBuffer.length > MODEL_FRAMES) featureBuffer.shift();
+
+      // 🔥【極速修正 2】管線分流：特徵蒐集維持 60fps 更新，只有「模型推論」才走 3 幀一次的節流
+      if (featureBuffer.length === MODEL_FRAMES && inferenceCooldown <= 0) {
+        inferenceFrameCount++;
+        
+        if (inferenceFrameCount % 3 === 0 && !isInferencing) {
+          isInferencing = true;
+          aiManager.runInference(featureBuffer, labelMap, currentVocabulary).then(res => {
+            isInferencing = false;
+            if (res) {
+              lastDebugInfo = res;
+              checkHit(res.label, res.confidence);
+            }
+          }).catch(() => { isInferencing = false; });
+        }
+      }
+    } else {
+      lastHandLandmarks = null;
+      handMissFrameCount++;
+      if (handMissFrameCount > HAND_PERSISTENCE_FRAMES) {
+        featureBuffer = []; 
+        disabledHitLabel = ""; 
+      }
+    }
+    if (inferenceCooldown > 0) inferenceCooldown--;
   }
   requestAnimationFrame(predictLoop); 
 }
