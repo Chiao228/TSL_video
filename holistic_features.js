@@ -36,10 +36,21 @@ const _keepIndices = [0, 3, 4, 7, 8, 11, 12, 15, 16, 19, 20];
  * 結構：左手(33維) + 右手(33維) = 66維
  */
 function extractFrame66(results) {
-  // 自動適配 MediaPipe Tasks-Vision 與舊版 Holistic 欄位命名
-  const poseLm  = results.poseLandmarks?.[0]  || results.poseLandmarks  || null;
-  const leftLm  = results.leftHandLandmarks?.[0] || results.leftHandLandmarks || null;
-  const rightLm = results.rightHandLandmarks?.[0] || results.rightHandLandmarks || null;
+  // 自動適配 MediaPipe Tasks-Vision 與舊版 Holistic 欄位命名，並進行維度安全校正
+  let poseLm = results.poseLandmarks || null;
+  if (poseLm && Array.isArray(poseLm) && poseLm.length > 0 && Array.isArray(poseLm[0])) {
+    poseLm = poseLm[0];
+  }
+
+  let leftLm = results.leftHandLandmarks || null;
+  if (leftLm && Array.isArray(leftLm) && leftLm.length > 0 && Array.isArray(leftLm[0])) {
+    leftLm = leftLm[0];
+  }
+
+  let rightLm = results.rightHandLandmarks || null;
+  if (rightLm && Array.isArray(rightLm) && rightLm.length > 0 && Array.isArray(rightLm[0])) {
+    rightLm = rightLm[0];
+  }
 
   // 計算肩膀中心 (作為全局原點)
   let sCenterX = 0.5, sCenterY = 0.5, sCenterZ = 0.0;
