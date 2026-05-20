@@ -136,26 +136,25 @@ self.addEventListener('fetch', event => {
     if (event.request.headers.get('range')) {
       event.respondWith(handleRangeRequest(event.request));
     } else {
-      event.respondWith(
-        // 加上 ignoreSearch: true，讓 app.js?v=xxx 可以直接命中 app.js 的快取
-        caches.match(event.request, { ignoreSearch: true }).then(response => {
-          if (response) {
-            return response;
+      // 🌟 重點：移除 { ignoreSearch: true }！讓帶有不同 ?v= 的請求能正確穿透舊快取
+      caches.match(event.request).then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request).then(networkResponse => {
+          if (networkResponse.ok && event.request.method === 'GET') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              // 將帶有新版號的請求當作新資產存入快取
+              cache.put(event.request, responseToCache);
+            });
           }
-          return fetch(event.request).then(networkResponse => {
-            if (networkResponse.ok && event.request.method === 'GET') {
-              const responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-            }
-            return networkResponse;
-          }).catch(err => {
-            console.error('[Service Worker] 網路請求失敗且無可用快取:', err);
-            return new Response('Offline content not available', { status: 503, statusText: 'Service Unavailable' });
-          });
-        })
-      );
+          return networkResponse;
+        }).catch(err => {
+          console.error('[Service Worker] 網路請求失敗且無可用快取:', err);
+          return new Response('Offline content not available', { status: 503, statusText: 'Service Unavailable' });
+        });
+      });
     }
   }
 });
