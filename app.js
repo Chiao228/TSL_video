@@ -38,6 +38,7 @@ let lastDebugInfo = null;
 let frameCount = 0;
 let inferenceFrameCount = 0;
 let slidingWindowIndex = 0;
+let gameInferenceHistory = [];
 let isInferencing = false; 
 let isAnalyzing = false;
 let labelMap = null;
@@ -184,6 +185,11 @@ function setupEventListeners() {
     };
   }
 
+  const exportCsvBtn = document.getElementById('export-csv-btn');
+  if (exportCsvBtn) {
+    exportCsvBtn.onclick = () => window.exportInferenceHistoryToCSV();
+  }
+
   const toggleDebugBtn = document.getElementById('toggle-debug-btn');
   if (toggleDebugBtn) {
     toggleDebugBtn.textContent = showDebugOverlay ? "📊 隱藏偵測資訊" : "📊 顯示偵測資訊";
@@ -304,6 +310,8 @@ window.forceStartGameFromHTML = function() {
     welcomeModal.style.display = 'none';
   }
   document.getElementById('difficulty-select').style.display = 'none';
+  const exportCsvBtn = document.getElementById('export-csv-btn');
+  if (exportCsvBtn) exportCsvBtn.style.display = 'block';
   updateGameState(true);
   
   window.addEventListener('click', forceAudioContextUnlock);
@@ -441,6 +449,7 @@ function initGame() {
   score = 0; gameOver = false; gamePaused = false; gameStarted = false;
   bombs = []; currentBeatIndex = 0; totalBombsDropped = 0;
   slidingWindowIndex = 0;
+  gameInferenceHistory = [];
   plane = new Plane(images.plane); window._bgmEndRealTime = null;
   initHouses(); updateGameState(true);
 }
@@ -589,6 +598,8 @@ function resetToHome(goToStory = false) {
     welcomeModal.style.opacity = '1';
     welcomeModal.style.pointerEvents = 'auto';
   }
+  const exportCsvBtn = document.getElementById('export-csv-btn');
+  if (exportCsvBtn) exportCsvBtn.style.display = 'none';
   if (goToStory) {
     document.getElementById('welcome-story-phase').style.display = 'flex';
     document.getElementById('welcome-rules-phase').style.display = 'none';
@@ -725,6 +736,21 @@ async function predictLoop() {
             isInferencing = false;
             if (res) {
               res.windowId = slidingWindowIndex;
+              const thresholds = getThresholdsForWord(res.label);
+              const isConsistent = (res.label === lastInferenceLabel);
+              const isPassed = (res.confidence >= thresholds.direct) || (isConsistent && res.confidence >= thresholds.exception);
+              const statusSymbol = isPassed ? "🟩 [通過門檻！]" : "🟥 [未達門檻]";
+              console.log(`🤖 [AI 推理] 滑窗: #${res.windowId} | 預測: [${res.label}] (信心值: ${res.confidence.toFixed(2)}) | 判定門檻: ${thresholds.direct.toFixed(2)} | 狀態: ${statusSymbol}`);
+              
+              gameInferenceHistory.push({
+                timestamp: new Date().toLocaleTimeString(),
+                windowId: res.windowId,
+                label: res.label,
+                confidence: res.confidence,
+                threshold: thresholds.direct,
+                isPassed: isPassed
+              });
+
               lastDebugInfo = res;
               checkHit(res.label, res.confidence);
             }
@@ -816,5 +842,26 @@ function renderDebugOverlay() {
     });
   }
 }
+
+window.exportInferenceHistoryToCSV = function() {
+  if (gameInferenceHistory.length === 0) {
+    alert("⚠️ 目前尚無任何 AI 推理紀錄可供匯出！");
+    return;
+  }
+  
+  let csvContent = "\ufeff時間,滑窗編號,預測詞彙,信心值,判定門檻,是否通過\n";
+  gameInferenceHistory.forEach(row => {
+    csvContent += `"${row.timestamp}",${row.windowId},"${row.label}",${row.confidence.toFixed(4)},${row.threshold.toFixed(2)},${row.isPassed ? "是" : "否"}\n`;
+  });
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `tsl_game_inference_log_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
 startApp();
