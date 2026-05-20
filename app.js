@@ -699,6 +699,10 @@ async function initWebcam() {
 }
 
 async function predictLoop() {
+  if (!gameStarted) {
+    requestAnimationFrame(predictLoop);
+    return;
+  }
   if (lastVideoFrame && aiManager.handLandmarker) {
     const ts = performance.now(); frameCount++;
 
@@ -798,6 +802,7 @@ function checkHit(label, confidence) {
 }
 
 function renderCamera() {
+  if (!gameStarted) return;
   const dpr = window.devicePixelRatio || 1; const cw = canvas.width / dpr, ch = canvas.height / dpr; const isMobile = cw < 768;
   const camW = isMobile ? 120 : 320, camH = isMobile ? 68 : 180; const camX = cw - camW - 10, camY = 10;
 
@@ -825,6 +830,7 @@ function renderCamera() {
 }
 
 function renderDebugOverlay() {
+  if (!gameStarted) return;
   const dpr = window.devicePixelRatio || 1; const ch = canvas.height / dpr; const isMobile = window.innerWidth < 768;
   const boxW = isMobile ? 220 : 420, boxH = isMobile ? 120 : 180; const x = 10, y = ch - boxH - 10;
   ctx.fillStyle = 'rgba(10, 15, 30, 0.5)'; ctx.beginPath(); ctx.roundRect(x, y, boxW, boxH, 15); ctx.fill();
