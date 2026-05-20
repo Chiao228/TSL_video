@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tsl-game-cache-v8';
+const CACHE_NAME = 'tsl-game-cache-v9';
 
 const STATIC_ASSETS = [
   './',
