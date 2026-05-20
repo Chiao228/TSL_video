@@ -1400,8 +1400,14 @@ async function predictLoop() {
     }
     if (inferenceCooldown > 0) inferenceCooldown--;
   }
-  // 🌟 使用 requestAnimationFrame 取代 setTimeout，讓偵測同步與螢幕重新整理頻率一致，達成最流暢追蹤
-  requestAnimationFrame(predictLoop);
+  // 替換成以下程式碼：
+  if (gameStarted && !gamePaused && !gameOver) {
+  // 遊戲進行中，用最快速度循環
+    setTimeout(predictLoop, 0); 
+  } else {
+  // 遊戲未開始或暫停時，放慢腳步節省 CPU 資源
+    requestAnimationFrame(predictLoop); 
+}
 }
 
 function checkHit(label, confidence) {
