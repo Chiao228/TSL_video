@@ -1400,12 +1400,6 @@ async function predictLoop() {
     }
     if (inferenceCooldown > 0) inferenceCooldown--;
   }
-  // 替換成以下程式碼：
-  if (gameStarted && !gamePaused && !gameOver) {
-  // 遊戲進行中，用最快速度循環
-    setTimeout(predictLoop, 0); 
-  } else {
-  // 遊戲未開始或暫停時，放慢腳步節省 CPU 資源
     requestAnimationFrame(predictLoop); 
 }
 }
@@ -1479,7 +1473,7 @@ function checkHit(label, confidence) {
 
       // 🌟 優化：防止同詞彙「連擊」現象
       // 修改為較短的幀數（例如 15~20 幀），搭配解鎖鎖定機制即可：
-      inferenceCooldown = 15;
+      inferenceCooldown = 20;
       // 2. 強制清空上次辨識標籤，要求玩家必須「重新累積」能量才能再次擊中
       lastInferenceLabel = "";
     } else {
