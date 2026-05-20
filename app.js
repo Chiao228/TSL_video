@@ -642,31 +642,33 @@ function handleGameOverUI(isWin) {
         const top10 = await getTop10Scores();
         showLeaderboard(top10);
       } else {
-        try {
-          const localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
-          showLeaderboard(localScores.slice(0, 10));
-        } catch (e) { showLeaderboard([]); }
+        // 未上傳雲端：直接回到音樂選擇，不顯示排行榜
+        if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer.currentTime = 0; }
+        resetToHome(false);
       }
     };
   }
 }
 
 async function showLeaderboard(top10) {
-  const modal = document.getElementById('leaderboard-modal'); let displayList = top10 || [];
+  const modal = document.getElementById('leaderboard-modal');
+  const displayList = (top10 || []).sort((a, b) => b.score - a.score);
+  
   if (displayList.length === 0) {
-    try { displayList = JSON.parse(localStorage.getItem('tsl_history') || '[]').slice(0, 10); } catch (e) {}
+    document.getElementById('leaderboard-list').innerHTML =
+      `<li style="text-align:center; padding: 20px; color: #888; font-size: 16px;">目前尚無雲端排行榜資料</li>`;
+  } else {
+    document.getElementById('leaderboard-list').innerHTML = displayList.map((p, i) => {
+      let medal = i + 1, color = "#fff";
+      if (i === 0) { medal = "🥇"; color = "#ffcc00"; }
+      else if (i === 1) { medal = "🥈"; color = "#C0C0C0"; }
+      else if (i === 2) { medal = "🥉"; color = "#cd7f32"; }
+      return `<li style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:10px; border-left:4px solid ${color};">
+        <div style="display:flex; align-items:center; gap:15px;"><span>${medal}</span><span style="font-weight:bold; color:${color};">${p.name}</span></div>
+        <div style="text-align:right;"><span style="color:#0f0; font-weight:bold;">${p.score}</span><span style="font-size:12px; color:#888; display:block;">${p.difficulty || "一般"}</span></div>
+      </li>`;
+    }).join('');
   }
-  displayList.sort((a, b) => b.score - a.score);
-  document.getElementById('leaderboard-list').innerHTML = displayList.map((p, i) => {
-    let medal = i + 1, color = "#fff";
-    if (i === 0) { medal = "🥇"; color = "#ffcc00"; }
-    else if (i === 1) { medal = "🥈"; color = "#C0C0C0"; }
-    else if (i === 2) { medal = "🥉"; color = "#cd7f32"; }
-    return `<li style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:10px; border-left:4px solid ${color};">
-      <div style="display:flex; align-items:center; gap:15px;"><span>${medal}</span><span style="font-weight:bold; color:${color};">${p.name}</span></div>
-      <div style="text-align:right;"><span style="color:#0f0; font-weight:bold;">${p.score}</span><span style="font-size:12px; color:#888; display:block;">${p.difficulty || "一般"}</span></div>
-    </li>`;
-  }).join('');
   modal.style.display = 'flex';
 }
 
