@@ -37,6 +37,7 @@ let disabledHitLabel = "";
 let lastDebugInfo = null;
 let frameCount = 0;
 let inferenceFrameCount = 0;
+let slidingWindowIndex = 0;
 let isInferencing = false; 
 let isAnalyzing = false;
 let labelMap = null;
@@ -439,6 +440,7 @@ function getDifficultyText() {
 function initGame() {
   score = 0; gameOver = false; gamePaused = false; gameStarted = false;
   bombs = []; currentBeatIndex = 0; totalBombsDropped = 0;
+  slidingWindowIndex = 0;
   plane = new Plane(images.plane); window._bgmEndRealTime = null;
   initHouses(); updateGameState(true);
 }
@@ -718,9 +720,14 @@ async function predictLoop() {
         inferenceFrameCount++;
         if (inferenceFrameCount % 3 === 0 && !isInferencing) {
           isInferencing = true;
+          slidingWindowIndex++;
           aiManager.runInference(featureBuffer, labelMap, currentVocabulary).then(res => {
             isInferencing = false;
-            if (res) { lastDebugInfo = res; checkHit(res.label, res.confidence); }
+            if (res) {
+              res.windowId = slidingWindowIndex;
+              lastDebugInfo = res;
+              checkHit(res.label, res.confidence);
+            }
           }).catch(() => { isInferencing = false; });
         }
       }
@@ -797,10 +804,10 @@ function renderDebugOverlay() {
   ctx.fillStyle = 'rgba(10, 15, 30, 0.5)'; ctx.beginPath(); ctx.roundRect(x, y, boxW, boxH, 15); ctx.fill();
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 1; ctx.stroke();
   ctx.fillStyle = '#00ffcc'; ctx.font = `bold ${isMobile ? 9 : 13}px monospace`; ctx.textAlign = 'left';
-  ctx.fillText(`[Buf] ${featureBuffer.length}/30 | [Hand] ${lastHandLandmarks?'YES':'NO'} | [CD] ${inferenceCooldown}`, x + 8, y + (isMobile ? 15 : 20));
+  ctx.fillText(`[Buf] ${featureBuffer.length}/30 | [Hand] ${lastHandLandmarks?'YES':'NO'} | [CD] ${inferenceCooldown} | [Win] #${slidingWindowIndex}`, x + 8, y + (isMobile ? 15 : 20));
 
   if (lastDebugInfo) {
-    ctx.fillStyle = '#ff0'; ctx.fillText(`=== AI 即時辨識 (信心值) ===`, x + 8, y + (isMobile ? 35 : 45));
+    ctx.fillStyle = '#ff0'; ctx.fillText(`=== AI 即時辨識 (滑窗: #${lastDebugInfo.windowId}) ===`, x + 8, y + (isMobile ? 35 : 45));
     lastDebugInfo.top4.forEach((p, i) => {
       ctx.fillStyle = '#fff'; ctx.fillText(`${p.label}: ${p.prob.toFixed(1)}`, x + 8, y + (isMobile ? 52 : 65) + i * (isMobile ? 12 : 18));
       ctx.fillStyle = '#444'; ctx.fillRect(x + (isMobile ? 120 : 150), y + (isMobile ? 44 : 55) + i * (isMobile ? 12 : 18), isMobile ? 50 : 100, isMobile ? 6 : 10);
