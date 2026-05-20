@@ -952,5 +952,40 @@ function renderDebugOverlay() {
     });
   }
 }
+// ==========================================================================
+// 🛡️ 全域無敵後備盾牌：繞過所有 JS 繫結死鎖，由 HTML 直接物理戳醒遊戲
+// ==========================================================================
+window.forceStartGameFromHTML = function() {
+  console.log("🎯 [HTML 物理破門] 偵測到使用者點擊啟動防禦系統按鈕！");
+  
+  // 1. 強制喚醒音訊
+  if (bgmPlayer) {
+    bgmPlayer.play()
+      .then(() => console.log("🎵 [物理破門] 背景音樂成功啟動！"))
+      .catch(err => console.warn("⚠️ [物理破門] 音訊播放受阻，等待主畫面點擊:", err));
+  }
+
+  // 2. 強制變更狀態
+  gameStarted = true;
+  gameOver = false;
+  gamePaused = false;
+
+  // 3. 瞬間粉碎全螢幕空氣牆遮罩
+  const welcomeModal = document.getElementById('welcome-modal');
+  if (welcomeModal) {
+    welcomeModal.style.pointerEvents = 'none';
+    welcomeModal.style.display = 'none';
+    welcomeModal.style.opacity = '0';
+  }
+
+  // 4. 隱藏導覽列下拉選單
+  const mainDiffSelect = document.getElementById('difficulty-select');
+  if (mainDiffSelect) mainDiffSelect.style.display = 'none';
+
+  // 5. 強制重繪 HUD 狀態，解除開始按鈕的鎖定
+  updateGameState(true);
+  
+  console.log("🚀 [物理破門] 遊戲系統已被強制戳醒並正式開戰！");
+};
 
 startApp();
