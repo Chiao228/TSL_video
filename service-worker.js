@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tsl-game-cache-v9';
+const CACHE_NAME = 'tsl-game-cache-v10';
 
 const STATIC_ASSETS = [
   './',
@@ -21,7 +21,6 @@ const STATIC_ASSETS = [
   './explosion.png',
   './default_bgm.mp3',
   './tsl_vocab_videos.json',
-  './local_leaderboard.json',
   './vision_bundle.mjs',
   
   // MediaPipe task and WASM files (local)
