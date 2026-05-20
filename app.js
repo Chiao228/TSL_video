@@ -1402,7 +1402,6 @@ async function predictLoop() {
   }
     requestAnimationFrame(predictLoop); 
 }
-}
 
 function checkHit(label, confidence) {
   const thresholds = getThresholdsForWord(label);
@@ -1616,4 +1615,3 @@ startApp();
 // -----------------------
 // 8. 綁定 UI 事件 (新增自動暫停邏輯)
 // -----------------------
-
