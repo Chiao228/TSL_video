@@ -1,5 +1,5 @@
 /**
- * ai_manager.js (終極優化版 - WebGPU + 多執行緒 WASM)
+ * ai_manager.js (終極優化版 - WebGPU + 隔離防禦)
  */
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from "./vision_bundle.mjs";
 import { MODEL_FRAMES, VIDEO_CDN_BASE } from './config.js';
@@ -11,7 +11,7 @@ export class AIManager {
     this.onnxSession = null;
     this.isInferring = false;
     
-    // 💡 優化 1：預先配置記憶體，避免推論時反覆 new Float32Array 造成 GC 阻塞
+    // 💡 優化 1：預先配置記憶體，避免推論時反覆建立 Float32Array 造成 GC 阻塞
     this.preAllocatedData = new Float32Array(MODEL_FRAMES * 66);
   }
 
@@ -57,26 +57,26 @@ export class AIManager {
       ? "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/"
       : "./";
     
-    // 🔥【GitHub Pages 終極相容優化】
-  // 徹底關閉 CPU 多執行緒，防堵瀏覽器 Cross-Origin Isolation 安全性攔截造成的非同步死鎖
-  ort.env.wasm.numThreads = 1; // 限制為單執行緒
-  ort.env.wasm.simd = true;   // 保持 SIMD 指令集優化（這個不需要安全標頭）
+    // 🌟【GitHub Pages 隔離環境優化】
+    // 預設為單執行緒以防止跨域隔離標頭（SharedArrayBuffer）造成的安全性死鎖
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.simd = true;
     
-    console.log(`🌐 ONNX Runtime WASM 執行緒數設定為: ${ort.env.wasm.numThreads}, SIMD: true`);
+    console.log(`🌐 ONNX Runtime WASM 執行緒限制為: 1 (單執行緒防護模式), SIMD: true`);
 
     const baseCdn = hasNetwork ? (VIDEO_CDN_BASE || '') : '';
     const onnxModelPath = `${baseCdn}train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx`;
     const onnxDataPath = `${baseCdn}train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx.data`;
     
+    // 優先使用 WebGPU（2026 頂級硬體加速），不支援時自動降級 WebGL 
     const executionProviders = ['webgpu', 'webgl', 'wasm'];
     const sessionOptions = {
       executionProviders: executionProviders, 
       graphOptimizationLevel: 'all', 
       enableCpuMemBuffer: true,
-      logSeverityLevel: 3 // 🌟 關鍵優化：調高日誌層級，直接封鎖 ONNX 內部的非致命警告，防堵非同步阻塞
+      logSeverityLevel: 3 // 🌟 隔離非致命警告，確保非同步 Promise 能順利落幕不卡死
     };
 
-    // 🌟 核心防禦改動：將 CDN 載入與本地載入拆開，確保只要有一邊成功，就能順利 return，絕不卡死 app.js
     try {
       console.log(`🧠 正在下載 ONNX 外部權重資料 (CDN)... | 路徑: ${onnxDataPath}`);
       const dataRes = await fetch(onnxDataPath);
@@ -91,12 +91,12 @@ export class AIManager {
 
       this.onnxSession = await ort.InferenceSession.create(onnxModelPath, sessionOptions);
       console.log(`✅ ONNX 模型（CDN 管道）載入成功！核心加速器啟用中。`);
-      return; // 🎉 成功就立刻退出，讓 app.js 繼續往下跑！
+      return; 
     } catch (err) {
       console.log(`ℹ️ CDN 模型或權重不可用，切換至本地端讀取路徑...`);
     }
 
-    // 後備路徑：本地載入
+    // 本地後備備援管線
     const localOnnxPath = `./train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx`;
     const localDataPath = `./train_V36_Transformer_66(modify augmentation + with new asl weight+ sliding window + K-fold + output F1-score)/Fold_1/tsl_model_fold1.onnx.data`;
     
@@ -122,12 +122,12 @@ export class AIManager {
       console.log(`✅ 本地 ONNX 手語分類模型與外部權重載入成功！`);
     } catch (localErr) {
       console.error(`❌ 嚴重錯誤：CDN 與本地模型權重載入完全失敗:`, localErr);
-      throw localErr; // 真的不行的話才拋出錯誤
+      throw localErr; 
     }
   }
 
   /**
-   * 🌟 優化後的本地 ONNX 手語預測
+   * 🌟 優化後的零分配（Zero-Allocation）手語預測
    */
   async runInference(featureBuffer, labelMap, currentVocabulary) {
     if (this.isInferring || featureBuffer.length < MODEL_FRAMES) return null;
@@ -139,12 +139,10 @@ export class AIManager {
         return null;
       }
 
-      // 直接寫入預配置的 Float32Array，大量減少 GC 耗時
       for (let i = 0; i < MODEL_FRAMES; i++) {
         this.preAllocatedData.set(featureBuffer[i], i * 66);
       }
 
-      // 使用預配置記憶體建立 Tensor
       const inputTensor = new ort.Tensor('float32', this.preAllocatedData, [1, MODEL_FRAMES, 66]);
       const feeds = { "input": inputTensor };
       
@@ -154,8 +152,7 @@ export class AIManager {
       
       const logits = outputTensor.data;
 
-      // 🔥 ⚡【關鍵速度優化 3】優化過濾算法
-      // 不要每次推論都跑對數十萬陣列的 Array.from() 與 slice()，只針對過濾後的 top 進行排序
+      // 💡 優化 2：直接在迴圈內使用 Set 進行難度交叉比對，大量減少產生物件陣列的記憶體消耗
       const activeWords = new Set(currentVocabulary.map(v => v.text));
       const filteredPredictions = [];
       
@@ -173,7 +170,7 @@ export class AIManager {
         label: top1?.label || "無",
         confidence: top1?.prob || 0,
         top4: filteredPredictions.slice(0, 4),
-        rawLogits: [] // 如果遊戲不需要印出前10個原始 logit，放空可節省大量 CPU 格式化運算時間
+        rawLogits: [] // 清空無意義格式化，大幅釋放 CPU
       };
 
     } catch (err) {
