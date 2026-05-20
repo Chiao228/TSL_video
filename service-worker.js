@@ -166,17 +166,17 @@ self.addEventListener('fetch', event => {
   }
 });
 // 處理媒體 Range 請求的防禦性程式碼
+// 處理媒體 Range 請求的防禦性程式碼
 async function handleRangeRequest(request) {
   const cache = await caches.open(CACHE_NAME);
+  // 優先從快取中尋找（因為預快取已經把影片以 200 OK 的形式完整存下來了）
   let response = await cache.match(request, { ignoreSearch: true });
   
   if (!response) {
     try {
-      response = await fetch(request);
-      if (response.ok && request.method === 'GET') {
-        const responseToCache = response.clone();
-        cache.put(request, responseToCache);
-      }
+      console.log(`[Service Worker] 媒體快取未命中，直接走網路串流: ${request.url}`);
+      // 🌟 關鍵修正：如果快取沒有，直接回傳網路請求，絕對不要執行 cache.put 企圖快取 206 回應
+      return await fetch(request);
     } catch (err) {
       return new Response('Offline media not available', { status: 503, statusText: 'Service Unavailable' });
     }
