@@ -610,21 +610,35 @@ function handleGameOverUI(isWin) {
       const pName = pNameInput.value.trim() || "匿名";
       commanderName = pName;
       
-      try {
-        await saveScoreToCloud(pName, finalScore, getDifficultyText());
-      } catch (err) {
-        console.error("雲端存檔失敗:", err);
+      // 再次確認 checkbox 狀態，防止按鈕顯示與勾選狀態不同步
+      const shouldUpload = uploadCloudCb ? uploadCloudCb.checked : false;
+      
+      if (shouldUpload) {
+        try {
+          await saveScoreToCloud(pName, finalScore, getDifficultyText());
+          console.log("☁️ 成績已上傳雲端排行榜");
+        } catch (err) {
+          console.error("雲端存檔失敗:", err);
+        }
       }
       
       const newRecord = { name: pName, score: finalScore, difficulty: getDifficultyText(), time: new Date().toLocaleString() };
       try {
         const localData = JSON.parse(localStorage.getItem('tsl_history') || '[]');
         localData.unshift(newRecord); localStorage.setItem('tsl_history', JSON.stringify(localData.slice(0, 20)));
+        if (!shouldUpload) {
+          let localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
+          localScores.push(newRecord);
+          localScores.sort((a, b) => b.score - a.score);
+          localStorage.setItem('local_leaderboard', JSON.stringify(localScores.slice(0, 50)));
+        }
       } catch (e) {}
       
       modal.style.display = 'none';
-      const top10 = await getTop10Scores();
-      showLeaderboard(top10);
+      const top10 = shouldUpload ? await getTop10Scores() : (() => {
+        try { return JSON.parse(localStorage.getItem('local_leaderboard') || '[]').slice(0, 10); } catch(e) { return []; }
+      })();
+      showLeaderboard(Array.isArray(top10) ? top10 : await top10);
     };
   }
   
