@@ -57,8 +57,10 @@ export class AIManager {
       ? "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/"
       : "./";
     
-    ort.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
-    ort.env.wasm.simd = true;
+    // 🔥【GitHub Pages 終極相容優化】
+  // 徹底關閉 CPU 多執行緒，防堵瀏覽器 Cross-Origin Isolation 安全性攔截造成的非同步死鎖
+  ort.env.wasm.numThreads = 1; // 限制為單執行緒
+  ort.env.wasm.simd = true;   // 保持 SIMD 指令集優化（這個不需要安全標頭）
     
     console.log(`🌐 ONNX Runtime WASM 執行緒數設定為: ${ort.env.wasm.numThreads}, SIMD: true`);
 
