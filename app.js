@@ -184,15 +184,16 @@ function setupEventListeners() {
 
   const uploadCloudCb = document.getElementById('result-upload-cloud');
   const resultSubmitBtn = document.getElementById('result-submit-btn');
-  const resultLocalBtn = document.getElementById('result-local-btn');
-  if (uploadCloudCb && resultSubmitBtn && resultLocalBtn) {
+  if (uploadCloudCb && resultSubmitBtn) {
     uploadCloudCb.onchange = () => {
       if (uploadCloudCb.checked) {
-        resultSubmitBtn.style.display = 'block';
-        resultLocalBtn.style.display = 'none';
+        resultSubmitBtn.textContent = '🚀 確認並上傳至雲端';
+        resultSubmitBtn.style.background = '#ffcc00';
+        resultSubmitBtn.style.color = '#000';
       } else {
-        resultSubmitBtn.style.display = 'none';
-        resultLocalBtn.style.display = 'block';
+        resultSubmitBtn.textContent = '💾 僅儲存本機';
+        resultSubmitBtn.style.background = '#3498db';
+        resultSubmitBtn.style.color = '#fff';
       }
     };
   }
@@ -576,20 +577,14 @@ function handleGameOverUI(isWin) {
   
   const uploadCloudCb = document.getElementById('result-upload-cloud');
   const submitBtn = document.getElementById('result-submit-btn');
-  const localBtn = document.getElementById('result-local-btn');
   
   if (uploadCloudCb) uploadCloudCb.checked = true;
   if (submitBtn) {
-    submitBtn.style.display = 'block';
     submitBtn.disabled = false;
     submitBtn.style.opacity = '1';
-    submitBtn.textContent = '🚀 確認並上傳';
-  }
-  if (localBtn) {
-    localBtn.style.display = 'none';
-    localBtn.disabled = false;
-    localBtn.style.opacity = '1';
-    localBtn.textContent = '💾 僅儲存本機';
+    submitBtn.textContent = '🚀 確認並上傳至雲端';
+    submitBtn.style.background = '#ffcc00';
+    submitBtn.style.color = '#000';
   }
   
   document.getElementById('result-title').textContent = isWin ? "🏆 任務成功" : "💥 任務失敗";
@@ -606,12 +601,16 @@ function handleGameOverUI(isWin) {
   
   if (submitBtn) {
     submitBtn.onclick = async () => {
-      submitBtn.disabled = true; submitBtn.textContent = "上傳中...";
+      // 在點擊當下直接從 DOM 讀取 checkbox 最新狀態，防止任何時序問題
+      const shouldUpload = !!(document.getElementById('result-upload-cloud')?.checked);
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = shouldUpload ? "上傳中..." : "儲存中...";
+      
       const pName = pNameInput.value.trim() || "匿名";
       commanderName = pName;
       
-      // 再次確認 checkbox 狀態，防止按鈕顯示與勾選狀態不同步
-      const shouldUpload = uploadCloudCb ? uploadCloudCb.checked : false;
+      const newRecord = { name: pName, score: finalScore, difficulty: getDifficultyText(), time: new Date().toLocaleString() };
       
       if (shouldUpload) {
         try {
@@ -620,51 +619,33 @@ function handleGameOverUI(isWin) {
         } catch (err) {
           console.error("雲端存檔失敗:", err);
         }
-      }
-      
-      const newRecord = { name: pName, score: finalScore, difficulty: getDifficultyText(), time: new Date().toLocaleString() };
-      try {
-        const localData = JSON.parse(localStorage.getItem('tsl_history') || '[]');
-        localData.unshift(newRecord); localStorage.setItem('tsl_history', JSON.stringify(localData.slice(0, 20)));
-        if (!shouldUpload) {
+      } else {
+        console.log("💾 [本機儲存] 已跨過雲端上傳");
+        try {
           let localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
           localScores.push(newRecord);
           localScores.sort((a, b) => b.score - a.score);
           localStorage.setItem('local_leaderboard', JSON.stringify(localScores.slice(0, 50)));
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
       
-      modal.style.display = 'none';
-      const top10 = shouldUpload ? await getTop10Scores() : (() => {
-        try { return JSON.parse(localStorage.getItem('local_leaderboard') || '[]').slice(0, 10); } catch(e) { return []; }
-      })();
-      showLeaderboard(Array.isArray(top10) ? top10 : await top10);
-    };
-  }
-  
-  if (localBtn) {
-    localBtn.onclick = () => {
-      localBtn.disabled = true; localBtn.textContent = "儲存中...";
-      const pName = pNameInput.value.trim() || "匿名";
-      commanderName = pName;
-      
-      const newRecord = { name: pName, score: finalScore, difficulty: getDifficultyText(), time: new Date().toLocaleString() };
+      // tsl_history 每次都存（不論有沒有上傳）
       try {
-        let localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
-        localScores.push(newRecord);
-        localScores.sort((a, b) => b.score - a.score);
-        localStorage.setItem('local_leaderboard', JSON.stringify(localScores.slice(0, 50)));
-        
         const localData = JSON.parse(localStorage.getItem('tsl_history') || '[]');
-        localData.unshift(newRecord); localStorage.setItem('tsl_history', JSON.stringify(localData.slice(0, 20)));
+        localData.unshift(newRecord);
+        localStorage.setItem('tsl_history', JSON.stringify(localData.slice(0, 20)));
       } catch (e) {}
       
       modal.style.display = 'none';
-      try {
-        const localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
-        showLeaderboard(localScores.slice(0, 10));
-      } catch (e) {
-        showLeaderboard([]);
+      
+      if (shouldUpload) {
+        const top10 = await getTop10Scores();
+        showLeaderboard(top10);
+      } else {
+        try {
+          const localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
+          showLeaderboard(localScores.slice(0, 10));
+        } catch (e) { showLeaderboard([]); }
       }
     };
   }

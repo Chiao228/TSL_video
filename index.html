@@ -367,7 +367,7 @@
 
     <script src="ort.min.js" onerror="this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js';"></script>
     <script src="holistic_features.js?v=20260521_v2"></script>
-    <script type="module" src="./app.js?v=20260521_v12"></script>
+    <script type="module" src="./app.js?v=20260521_v13"></script>
 
     <div id="leaderboard-modal" onclick="if(event.target === this) window.forceCloseLeaderboard();" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(8px); cursor: pointer;">
         <div style="background: #111; padding: 30px; border-radius: 15px; border: 3px solid #0f0; width: 85%; max-width: 400px; text-align: center; color: white; box-shadow: 0 0 20px rgba(0,255,0,0.5);">
@@ -423,8 +423,7 @@
                     <input type="checkbox" id="result-upload-cloud" checked style="width: 20px; height: 20px; cursor: pointer;">
                     <label for="result-upload-cloud" style="font-size: 18px; color: #e2e8f0; cursor: pointer;">上傳至雲端排行榜</label>
                 </div>
-                <button id="result-submit-btn" style="background: #ffcc00; color: #000; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 20px; transition: all 0.2s;">🚀 確認並上傳</button>
-                <button id="result-local-btn" style="background: #3498db; color: #fff; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 20px; transition: all 0.2s; display: none;">💾 僅儲存本機</button>
+                <button id="result-submit-btn" style="background: #ffcc00; color: #000; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 20px; transition: all 0.2s;">🚀 確認並上傳至雲端</button>
             </div>
         </div>
     </div>
@@ -461,6 +460,7 @@
                         console.log(`🚀 手語小鎮防禦罩 (SW) 啟動成功！作戰配置版本: ${DEFENSE_SYSTEM_VERSION}`);
                         
                         registration.addEventListener('updatefound', () => {
+                            const CACHE_NAME = 'tsl-game-cache-v25';
                             const newWorker = registration.installing;
                             if (newWorker) {
                                 newWorker.addEventListener('statechange', () => {
