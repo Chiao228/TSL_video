@@ -51,7 +51,6 @@ let handMissFrameCount = 0;
 window._memoryHistory = []; 
 let showDebugOverlay = false;
 
-// 🔥【效能優化】時間戳記控制節流，防堵高頻率重複渲染
 let lastHudUpdateTime = 0; 
 let lastPoseDetectTime = 0;
 
@@ -152,7 +151,7 @@ window.selectOnboardingDifficulty = (level) => {
 };
 
 // -----------------------
-// 4. UI 事件綁定與控制
+// 4. UI 事件繫結
 // -----------------------
 function setupEventListeners() {
   function openModal(id) {
@@ -160,7 +159,7 @@ function setupEventListeners() {
     if (!modal) return;
     modal.style.display = 'flex';
     if (gameStarted && !gamePaused && !gameOver) {
-      document.getElementById('pause-btn')?.click();
+      window.forcePauseGameFromHTML();
     }
   }
 
@@ -171,9 +170,6 @@ function setupEventListeners() {
   document.getElementById('close-tutorial-btn').onclick = () => { document.getElementById('tutorial-modal').style.display = 'none'; };
   document.getElementById('close-history-btn').onclick = () => { document.getElementById('history-modal').style.display = 'none'; };
   document.getElementById('difficulty-select').onchange = updateVocabulary;
-
-  document.getElementById('close-leaderboard-btn').onclick = () => { document.getElementById('leaderboard-modal').style.display = 'none'; resetToHome(true); };
-  document.getElementById('leaderboard-restart-btn').onclick = () => { document.getElementById('leaderboard-modal').style.display = 'none'; resetToHome(false); };
 
   const toggleDebugBtn = document.getElementById('toggle-debug-btn');
   if (toggleDebugBtn) {
@@ -193,9 +189,17 @@ function setupEventListeners() {
     document.getElementById('welcome-rules-phase').style.display = 'none';
     document.getElementById('welcome-music-phase').style.display = 'flex';
   };
+
+  // 🔥【核心優化】音樂解析完成前，強制封鎖下一步按鈕，杜絕帶空資料強行過關
   document.getElementById('welcome-music-next-btn').onclick = () => {
-    if (isAnalyzing) return alert("⏳ 音樂作戰頻率解析中，請稍候！");
-    if (onboardingMusicMode === 'upload' && musicBeats.length === 0) return alert("請先上傳您的作戰音樂檔案！");
+    if (isAnalyzing) {
+      alert("⏳ 雷達報告：AI 系統正在全速解析您的作戰音軌頻率，請稍候片刻再點擊下一步！");
+      return;
+    }
+    if (onboardingMusicMode === 'upload' && musicBeats.length === 0) {
+      alert("⚠️ 作戰提示：請先點擊下方虛線框，上傳您的本機音樂檔案以供 AI 分析！");
+      return;
+    }
     document.getElementById('welcome-music-phase').style.display = 'none';
     document.getElementById('welcome-difficulty-phase').style.display = 'flex';
   };
@@ -245,16 +249,18 @@ function setupEventListeners() {
 }
 setTimeout(setupEventListeners, 300);
 
-// -----------------------
-// 5. 🛠️ 終極硬解鎖與物理破門機制（徹底粉碎 HTML / 瀏覽器安全限制）
-// -----------------------
+// ==========================================================================
+// 🛡️ 5. 全域實體控制中心：全面替代 .addEventListener 防止監聽器重刷脫鉤
+// ==========================================================================
+
+// 🚀 啟動防禦/開始遊戲
 window.forceStartGameFromHTML = function() {
   console.log("🎯 [HTML 物理破門] 觸發強行啟動！");
   if (isAnalyzing || musicBeats.length === 0) return alert("音樂尚未解析完畢，請稍候！");
 
   if (bgmPlayer) {
     bgmPlayer.play().catch(() => {
-      console.warn("⚠️ 瀏覽器阻止了第一現場播音，已掛載備援網，點擊主畫面任意處即可開火。");
+      console.warn("⚠️ 自動播放受阻，已掛載備援隔離網。");
     });
   }
 
@@ -276,15 +282,72 @@ function forceAudioContextUnlock() {
   if (!gameStarted || gameOver || gamePaused) return;
   if (bgmPlayer && bgmPlayer.paused) {
     bgmPlayer.play().then(() => {
-      console.log("🎵 [物理破門成功] 戰鬥時間軸正式流動！");
+      console.log("🎵 [物理解鎖成功] 音訊時間軸流動！");
       window.removeEventListener('click', forceAudioContextUnlock);
       window.removeEventListener('touchstart', forceAudioContextUnlock);
     });
   }
 }
 
+// ⏸️ 暫停與繼續 
+window.forcePauseGameFromHTML = function() {
+  console.log("🎯 [HTML 物理破門] 暫停/繼續狀態切換");
+  gamePaused = !gamePaused;
+  if (bgmPlayer) {
+    if (gamePaused) bgmPlayer.pause();
+    else bgmPlayer.play().catch(() => {});
+  }
+  updateGameState(true);
+};
+
+// 🔄 重新開始
+window.forceRestartGameFromHTML = function() {
+  console.log("🎯 [HTML 物理破門] 重新開始請求");
+  if (!gameStarted || gameOver) {
+    performRestartAction();
+  } else {
+    const rm = document.getElementById('restart-confirm-modal');
+    if (rm) {
+      rm.style.display = 'flex';
+      document.getElementById('restart-cancel-btn').onclick = () => rm.style.display = 'none';
+      document.getElementById('restart-confirm-btn').onclick = () => {
+        rm.style.display = 'none';
+        performRestartAction();
+      };
+    }
+  }
+};
+
+// 🚪 結束遊戲任務
+window.forceExitGameFromHTML = function() {
+  console.log("🎯 [HTML 物理破門] 結束遊戲請求");
+  if (!gameStarted || gameOver) {
+    performExitGameAction();
+  } else {
+    const exitModal = document.getElementById('exit-confirm-modal');
+    if (exitModal) {
+      exitModal.style.display = 'flex';
+      document.getElementById('exit-cancel-btn').onclick = () => exitModal.style.display = 'none';
+      document.getElementById('exit-confirm-btn').onclick = () => {
+        exitModal.style.display = 'none';
+        performExitGameAction();
+      };
+    }
+  }
+};
+
+function performRestartAction() {
+  if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer.currentTime = 0; }
+  resetToHome(false);
+}
+
+function performExitGameAction() {
+  if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer.currentTime = 0; }
+  resetToHome(true); 
+}
+
 // -----------------------
-// 6. 遊戲核心架構與初始化
+// 6. 遊戲核心管線與循環
 // -----------------------
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -376,33 +439,8 @@ async function preloadDefaultBGM() {
   } catch (err) { console.error(err); } finally { isAnalyzing = false; updateGameState(true); }
 }
 
-document.getElementById('start-btn')?.addEventListener('click', () => {
-  if (gameOver) return resetToHome();
-  if (isAnalyzing || musicBeats.length === 0) return;
-  gameStarted = true; if (bgmPlayer) bgmPlayer.play();
-  updateGameState(true);
-});
-
-document.getElementById('pause-btn')?.addEventListener('click', () => {
-  gamePaused = !gamePaused;
-  if (bgmPlayer) gamePaused ? bgmPlayer.pause() : bgmPlayer.play();
-  updateGameState(true);
-});
-
-document.getElementById('restart-btn')?.addEventListener('click', () => {
-  if (!gameStarted || gameOver) return performRestart();
-  const rm = document.getElementById('restart-confirm-modal'); rm.style.display = 'flex';
-  document.getElementById('restart-cancel-btn').onclick = () => rm.style.display = 'none';
-  document.getElementById('restart-confirm-btn').onclick = () => { rm.style.display = 'none'; performRestart(); };
-});
-
-function performRestart() {
-  if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer.currentTime = 0; }
-  resetToHome(false);
-}
-
 // -----------------------
-// 7. 遊戲時鐘管線 (Tick)
+// 7. 遊戲主迴圈
 // -----------------------
 function tick() {
   update(); draw(); requestAnimationFrame(tick);
@@ -452,6 +490,9 @@ function applyDamage(bomb) {
   if (houses.length === 0) endGame(false);
 }
 
+// -----------------------
+// 8. 結算與排行榜管線
+// -----------------------
 function endGame(isWin) {
   gameStarted = false; gameOver = true; win = isWin;
   if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer.currentTime = 0; }
@@ -526,6 +567,9 @@ function resetToHome(goToStory = false) {
   window.selectOnboardingDifficulty('1');
 }
 
+// -----------------------
+// 9. 🎨 畫布渲染中心
+// -----------------------
 function draw() {
   const dpr = window.devicePixelRatio || 1; const cw = canvas.width / dpr, ch = canvas.height / dpr;
   ctx.clearRect(0, 0, cw, ch); ctx.drawImage(images.background, 0, 0, cw, ch);
@@ -550,7 +594,6 @@ function draw() {
   renderCamera();
   if (showDebugOverlay) renderDebugOverlay();
 
-  // 150ms 節流控制 UI 排版更新，徹底消滅網頁 Reflow 負擔
   const now = performance.now();
   if (now - lastHudUpdateTime > 150) { updateGameState(false); lastHudUpdateTime = now; }
 }
@@ -558,6 +601,27 @@ function draw() {
 function updateGameState(forceUpdateDOM = false) {
   const diffSelect = document.getElementById('difficulty-select');
   let diffText = diffSelect ? `等級 ${diffSelect.value}` : "一般";
+  
+  // 🌟【精準解鎖】即時動態更新前導頁面「下一步」按鈕的物理與視覺外觀
+  const onboardingMusicNextBtn = document.getElementById('welcome-music-next-btn');
+  if (onboardingMusicNextBtn) {
+    if (isAnalyzing) {
+      onboardingMusicNextBtn.disabled = true;
+      onboardingMusicNextBtn.style.cursor = 'not-allowed';
+      onboardingMusicNextBtn.style.opacity = '0.5';
+      onboardingMusicNextBtn.style.background = 'linear-gradient(135deg, #555, #333)';
+      onboardingMusicNextBtn.style.boxShadow = 'none';
+      onboardingMusicNextBtn.innerHTML = '⏳ 音樂作戰頻率解析中，請稍候...';
+    } else {
+      onboardingMusicNextBtn.disabled = false;
+      onboardingMusicNextBtn.style.cursor = 'pointer';
+      onboardingMusicNextBtn.style.opacity = '1.0';
+      onboardingMusicNextBtn.style.background = 'linear-gradient(135deg, #00e5ff, #0088cc)';
+      onboardingMusicNextBtn.style.boxShadow = '0 4px 15px rgba(0, 229, 255, 0.3)';
+      onboardingMusicNextBtn.innerHTML = '下一步：設定作戰難度 ⏭️';
+    }
+  }
+
   if (forceUpdateDOM || performance.now() - lastHudUpdateTime > 140) {
     updateHud({
       score, housesCount: houses.length, difficultyText: diffText,
@@ -569,7 +633,7 @@ function updateGameState(forceUpdateDOM = false) {
 }
 
 // -----------------------
-// 8. 📷 MediaPipe 視覺零延遲推論管線
+// 10. 📷 MediaPipe 雙手視覺跟蹤管線
 // -----------------------
 async function initWebcam() {
   if (!navigator.mediaDevices?.getUserMedia) return alert("環境不支援相機。");
@@ -583,10 +647,8 @@ async function predictLoop() {
   if (lastVideoFrame && aiManager.handLandmarker) {
     const ts = performance.now(); frameCount++;
 
-    // 視覺流：1:1 影格捕捉，絕不跳幀，確保綠色骨架完完全全跟手、不慢半拍
     const handRes = aiManager.handLandmarker.detectForVideo(lastVideoFrame, ts);
     
-    // 姿態流：每 250ms 做一次肩膀節流計算就完全夠用，幫 CPU 降載
     if (ts - lastPoseDetectTime > 250 || !lastPoseRes) {
       lastPoseRes = aiManager.poseLandmarker.detectForVideo(lastVideoFrame, ts);
       lastPoseDetectTime = ts;
@@ -610,7 +672,6 @@ async function predictLoop() {
       featureBuffer.push(frame);
       if (featureBuffer.length > MODEL_FRAMES) featureBuffer.shift();
 
-      // 推論流：管線分流，只有 Transformer 模型運算才走每 3 幀一次的滑窗推論
       if (featureBuffer.length === MODEL_FRAMES && inferenceCooldown <= 0) {
         inferenceFrameCount++;
         if (inferenceFrameCount % 3 === 0 && !isInferencing) {
