@@ -1478,8 +1478,8 @@ function checkHit(label, confidence) {
       disabledHitLabel = label;
 
       // 🌟 優化：防止同詞彙「連擊」現象
-      // 1. 提高冷卻時間至 45 幀 (約 0.75秒)，讓玩家有時間放下手或換動作
-      inferenceCooldown = 45;
+      // 修改為較短的幀數（例如 15~20 幀），搭配解鎖鎖定機制即可：
+      inferenceCooldown = 15;
       // 2. 強制清空上次辨識標籤，要求玩家必須「重新累積」能量才能再次擊中
       lastInferenceLabel = "";
     } else {
