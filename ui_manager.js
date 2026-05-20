@@ -66,7 +66,10 @@ export function updateHud(state) {
     // 🌟 核心戰鬥狀態
     if (statusEl) statusEl.textContent = '狀態: 🚀 任務執行中...';
     if (startBtn) startBtn.style.display = 'none'; 
-    if (pauseBtn) pauseBtn.style.display = 'block';
+    if (pauseBtn) {
+      pauseBtn.style.display = 'block';
+      pauseBtn.textContent = '暫停';
+    }
     if (restartBtn) restartBtn.style.display = 'none';
     if (exitBtn) exitBtn.style.display = 'block';
   }

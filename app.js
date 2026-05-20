@@ -12,7 +12,7 @@ import { FilesetResolver, HandLandmarker, PoseLandmarker, DrawingUtils } from ".
 
 import { Plane, Bomb } from './game_objects.js?v=20260519';
 import { AIManager } from './ai_manager.js?v=20260519';
-import { updateHud, renderHistory, loadTutorialVideos } from './ui_manager.js?v=20260519';
+import { updateHud, renderHistory, loadTutorialVideos } from './ui_manager.js?v=20260521_v2';
 import { analyzeBeatsSmartJS } from './audio_processor.js?v=20260519'; 
 import { saveScoreToCloud, getTop10Scores } from './firebase_manager.js?v=20260519';
 
@@ -179,9 +179,21 @@ function setupEventListeners() {
   
   const leaderboardRestartBtn = document.getElementById('leaderboard-restart-btn');
   if (leaderboardRestartBtn) {
-    leaderboardRestartBtn.onclick = () => {
-      document.getElementById('leaderboard-modal').style.display = 'none';
-      window.forceRestartGameFromHTML();
+    leaderboardRestartBtn.onclick = () => window.forcePlayAgainFromLeaderboard();
+  }
+
+  const uploadCloudCb = document.getElementById('result-upload-cloud');
+  const resultSubmitBtn = document.getElementById('result-submit-btn');
+  const resultLocalBtn = document.getElementById('result-local-btn');
+  if (uploadCloudCb && resultSubmitBtn && resultLocalBtn) {
+    uploadCloudCb.onchange = () => {
+      if (uploadCloudCb.checked) {
+        resultSubmitBtn.style.display = 'block';
+        resultLocalBtn.style.display = 'none';
+      } else {
+        resultSubmitBtn.style.display = 'none';
+        resultLocalBtn.style.display = 'block';
+      }
     };
   }
 
@@ -386,6 +398,21 @@ function performExitGameAction() {
   resetToHome(true); 
 }
 
+// 📋 關閉排行榜並回到故事背景
+window.forceCloseLeaderboard = function() {
+  const modal = document.getElementById('leaderboard-modal');
+  if (modal) modal.style.display = 'none';
+  resetToHome(true);
+};
+
+// 🎮 再玩一次：關閉排行榜並回到音樂選擇階段
+window.forcePlayAgainFromLeaderboard = function() {
+  const modal = document.getElementById('leaderboard-modal');
+  if (modal) modal.style.display = 'none';
+  if (bgmPlayer) { bgmPlayer.pause(); bgmPlayer.currentTime = 0; }
+  resetToHome(false);
+};
+
 // -----------------------
 // 6. 遊戲核心管線與循環
 // -----------------------
@@ -547,8 +574,24 @@ function handleGameOverUI(isWin) {
   const modal = document.getElementById('result-modal');
   document.getElementById('result-player-name').value = commanderName;
   
+  const uploadCloudCb = document.getElementById('result-upload-cloud');
   const submitBtn = document.getElementById('result-submit-btn');
-  submitBtn.disabled = false; submitBtn.style.opacity = "1";
+  const localBtn = document.getElementById('result-local-btn');
+  
+  if (uploadCloudCb) uploadCloudCb.checked = true;
+  if (submitBtn) {
+    submitBtn.style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.style.opacity = '1';
+    submitBtn.textContent = '🚀 確認並上傳';
+  }
+  if (localBtn) {
+    localBtn.style.display = 'none';
+    localBtn.disabled = false;
+    localBtn.style.opacity = '1';
+    localBtn.textContent = '💾 僅儲存本機';
+  }
+  
   document.getElementById('result-title').textContent = isWin ? "🏆 任務成功" : "💥 任務失敗";
   document.getElementById('result-title').style.color = isWin ? "#ffcc00" : "#ff3333";
   document.getElementById('result-stats').innerHTML = `
@@ -558,17 +601,59 @@ function handleGameOverUI(isWin) {
     <div style="display:flex; justify-content:space-between; font-weight:bold; color:#ffcc00; font-size:24px;"><span>總計得分:</span> <span>${finalScore}</span></div>
   `;
   modal.style.display = 'flex';
-  submitBtn.onclick = () => {
-    submitBtn.disabled = true; submitBtn.textContent = "處理中...";
-    const pName = document.getElementById('result-player-name').value.trim() || "匿名";
-    commanderName = pName;
-    const newRecord = { name: pName, score: finalScore, difficulty: getDifficultyText(), time: new Date().toLocaleString() };
-    try {
-      const localData = JSON.parse(localStorage.getItem('tsl_history') || '[]');
-      localData.unshift(newRecord); localStorage.setItem('tsl_history', JSON.stringify(localData.slice(0, 20)));
-    } catch (e) {}
-    modal.style.display = 'none'; getTop10Scores().then(showLeaderboard);
-  };
+  
+  const pNameInput = document.getElementById('result-player-name');
+  
+  if (submitBtn) {
+    submitBtn.onclick = async () => {
+      submitBtn.disabled = true; submitBtn.textContent = "上傳中...";
+      const pName = pNameInput.value.trim() || "匿名";
+      commanderName = pName;
+      
+      try {
+        await saveScoreToCloud(pName, finalScore, getDifficultyText());
+      } catch (err) {
+        console.error("雲端存檔失敗:", err);
+      }
+      
+      const newRecord = { name: pName, score: finalScore, difficulty: getDifficultyText(), time: new Date().toLocaleString() };
+      try {
+        const localData = JSON.parse(localStorage.getItem('tsl_history') || '[]');
+        localData.unshift(newRecord); localStorage.setItem('tsl_history', JSON.stringify(localData.slice(0, 20)));
+      } catch (e) {}
+      
+      modal.style.display = 'none';
+      const top10 = await getTop10Scores();
+      showLeaderboard(top10);
+    };
+  }
+  
+  if (localBtn) {
+    localBtn.onclick = () => {
+      localBtn.disabled = true; localBtn.textContent = "儲存中...";
+      const pName = pNameInput.value.trim() || "匿名";
+      commanderName = pName;
+      
+      const newRecord = { name: pName, score: finalScore, difficulty: getDifficultyText(), time: new Date().toLocaleString() };
+      try {
+        let localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
+        localScores.push(newRecord);
+        localScores.sort((a, b) => b.score - a.score);
+        localStorage.setItem('local_leaderboard', JSON.stringify(localScores.slice(0, 50)));
+        
+        const localData = JSON.parse(localStorage.getItem('tsl_history') || '[]');
+        localData.unshift(newRecord); localStorage.setItem('tsl_history', JSON.stringify(localData.slice(0, 20)));
+      } catch (e) {}
+      
+      modal.style.display = 'none';
+      try {
+        const localScores = JSON.parse(localStorage.getItem('local_leaderboard') || '[]');
+        showLeaderboard(localScores.slice(0, 10));
+      } catch (e) {
+        showLeaderboard([]);
+      }
+    };
+  }
 }
 
 async function showLeaderboard(top10) {

@@ -367,14 +367,14 @@
 
     <script src="ort.min.js" onerror="this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js';"></script>
     <script src="holistic_features.js?v=20260521_v2"></script>
-    <script type="module" src="./app.js?v=20260521_v7"></script>
+    <script type="module" src="./app.js?v=20260521_v11"></script>
 
-    <div id="leaderboard-modal" onclick="if(event.target === this) this.style.display='none';" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(8px); cursor: pointer;">
+    <div id="leaderboard-modal" onclick="if(event.target === this) window.forceCloseLeaderboard();" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(8px); cursor: pointer;">
         <div style="background: #111; padding: 30px; border-radius: 15px; border: 3px solid #0f0; width: 85%; max-width: 400px; text-align: center; color: white; box-shadow: 0 0 20px rgba(0,255,0,0.5);">
             <h2 style="color: #0f0; margin-top: 0; font-size: 28px;">🌍 全球排行榜 🌍</h2>
             <ul id="leaderboard-list" style="list-style: none; padding: 0; margin: 20px 0; max-height: 300px; overflow-y: auto;"></ul>
             <div style="display: flex; gap: 15px; width: 100%; box-sizing: border-box;">
-                <button id="close-leaderboard-btn" onclick="document.getElementById('leaderboard-modal').style.display='none';" style="flex: 1; padding: 15px; font-size: 18px; cursor: pointer; background: rgba(255,255,255,0.05); color: #fff; border: 1.5px solid rgba(255,255,255,0.2); border-radius: 10px; font-weight: bold; pointer-events: auto !important;">關閉視窗</button>
+                <button id="close-leaderboard-btn" onclick="window.forceCloseLeaderboard();" style="flex: 1; padding: 15px; font-size: 18px; cursor: pointer; background: rgba(255,255,255,0.05); color: #fff; border: 1.5px solid rgba(255,255,255,0.2); border-radius: 10px; font-weight: bold; pointer-events: auto !important;">關閉視窗</button>
                 <button id="leaderboard-restart-btn" style="flex: 1; padding: 15px; font-size: 18px; cursor: pointer; background: linear-gradient(135deg, #00ff66, #00b050); color: #050a14; border: none; border-radius: 10px; font-weight: bold; pointer-events: auto !important; box-shadow: 0 4px 15px rgba(0, 255, 102, 0.4);">🎮 再玩一次</button>
             </div>
         </div>
@@ -423,7 +423,8 @@
                     <input type="checkbox" id="result-upload-cloud" checked style="width: 20px; height: 20px; cursor: pointer;">
                     <label for="result-upload-cloud" style="font-size: 18px; color: #e2e8f0; cursor: pointer;">上傳至雲端排行榜</label>
                 </div>
-                <button id="result-submit-btn" style="background: #ffcc00; color: #000; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 20px; transition: all 0.2s;">確認並送出成績</button>
+                <button id="result-submit-btn" style="background: #ffcc00; color: #000; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 20px; transition: all 0.2s;">🚀 確認並上傳</button>
+                <button id="result-local-btn" style="background: #3498db; color: #fff; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; font-size: 20px; transition: all 0.2s; display: none;">💾 僅儲存本機</button>
             </div>
         </div>
     </div>
