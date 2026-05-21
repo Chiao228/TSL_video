@@ -82,7 +82,7 @@ export async function analyzeBeatsSmartJS(audioBuffer) {
   let filteredEvents = []; 
   let lastBombTime = -999.0;
   for (let ev of allEvents) {
-    if (ev.time - lastBombTime >= 1.5) {
+    if (ev.time - lastBombTime >= 2.5) {
       filteredEvents.push(ev); 
       lastBombTime = ev.time;
     }
@@ -95,8 +95,8 @@ export async function analyzeBeatsSmartJS(audioBuffer) {
     for (let i = 1; i < filteredEvents.length; i++) {
       let prevTime = finalEvents[finalEvents.length - 1].time;
       let curr = filteredEvents[i];
-      while (curr.time - prevTime > 4.0) {
-        let fillerTime = prevTime + 2.0;
+      while (curr.time - prevTime > 5.0) {
+        let fillerTime = prevTime + 5.0;
         if (curr.time - fillerTime < 0.8) break;
         finalEvents.push({ time: fillerTime, lane: Math.floor(Math.random() * 3) });
         prevTime = fillerTime;
